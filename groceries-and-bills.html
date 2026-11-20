@@ -1,0 +1,1459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#17693a" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0e1510" media="(prefers-color-scheme: dark)" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+<!-- Home-screen install (Safari / iOS): opens fullscreen like a real app -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Groceries" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<title>Groceries and Bills</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2ee; --surface:#ffffff; --surface2:#e6ede6; --ink:#132017; --muted:#5c6f60;
+    --line:#d5ded5; --accent:#17693a; --accent-ink:#ffffff; --gold:#b97f16; --gold-bg:#fdf3d7;
+    --danger:#b3261e; --danger-bg:#fdecea; --ok:#17693a; --ok-bg:#e2f1e6;
+    --shadow:0 1px 3px rgba(19,32,23,.08),0 8px 24px rgba(19,32,23,.06);
+    --radius:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e1510; --surface:#182219; --surface2:#212e24; --ink:#e9f1ea; --muted:#9db3a2;
+      --line:#2c3d30; --accent:#4cc273; --accent-ink:#0c1a10; --gold:#e5b95a; --gold-bg:#2e2a17;
+      --danger:#f08a84; --danger-bg:#331d1b; --ok:#4cc273; --ok-bg:#1c2f21;
+      --shadow:0 1px 3px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.45;padding-bottom:96px}
+  button,[role="button"],select,input{font:inherit}
+  button{min-height:48px;cursor:pointer}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 8px}
+
+  /* summary strip */
+  .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 12px 10px;box-shadow:var(--shadow)}
+  .stat .num{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .stat .lab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:4px}
+  .dateline{font-size:13px;font-weight:700;color:var(--muted);margin:2px 2px 10px}
+
+  /* panels */
+  .panel{display:none}
+  .panel.active{display:block}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+  .card h2{font-size:19px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
+  .card .sub{color:var(--muted);font-size:14px;margin:0 0 12px}
+
+  /* keyboard-dictation hint — tap the keyboard mic to talk into the app */
+  .dictate-hint{font-size:14px;font-weight:700;color:var(--ink);background:var(--ok-bg);border:1px solid var(--accent);border-radius:10px;padding:9px 12px;margin:10px 0 0;line-height:1.4}
+  .fieldrow{display:flex;gap:8px;align-items:flex-end}
+  .fieldrow .grow{flex:1;min-width:0}
+
+  /* add forms */
+  .addrow{display:flex;gap:8px;margin-top:12px}
+  .addrow input[type="text"],.addrow input[type="number"],.field input,.field select{flex:1;min-width:0;width:100%;min-height:48px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font-size:16px}
+  .addrow input:focus,.field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  .btn{border:none;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:800;padding:0 20px;min-height:48px}
+  .btn.secondary{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+  .btn.gold{background:var(--gold);color:#fff}
+  @media (prefers-color-scheme: dark){.btn.gold{color:#1a1405}}
+  .btn.small{min-height:40px;padding:0 14px;font-size:14px;border-radius:10px}
+  .formgrid{display:grid;gap:10px;margin-top:4px}
+  .field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px}
+  .field{display:block;min-width:0}
+  /* iOS Safari gives date inputs an intrinsic minimum width that can push
+     the casing past the card edge — pin the field to its column. */
+  .field input[type="date"]{display:block;width:100%;min-width:0;max-width:100%}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .two>*{min-width:0}
+  .two .amt{grid-column:auto}
+  /* Phone width: stack the side-by-side fields so nothing is clipped off the right edge */
+  @media (max-width:560px){
+    .two{grid-template-columns:1fr}
+  }
+
+  /* quick chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:0 14px;min-height:40px;font-size:14px;font-weight:700}
+  .chip:active{background:var(--surface2)}
+  .chips-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:14px}
+
+  /* lists */
+  ul.items{list-style:none;margin:0;padding:0}
+  .item{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:none}
+  .check{flex:0 0 auto;width:44px;height:44px;min-height:44px;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;color:transparent;padding:0}
+  .check svg{width:20px;height:20px}
+  .item.done .check{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .item .main{flex:1;min-width:0}
+  .item .name{font-weight:700;font-size:16px;overflow-wrap:anywhere}
+  .item.done .name{text-decoration:line-through;color:var(--muted)}
+  .item .meta{font-size:13px;color:var(--muted)}
+  .item .amount{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:16px;white-space:nowrap}
+  .del{flex:0 0 auto;width:44px;height:44px;min-height:44px;border:none;background:transparent;color:var(--muted);border-radius:10px;font-size:20px;line-height:1;padding:0}
+  .qty{display:flex;align-items:center;gap:2px}
+  .qty button{width:38px;height:38px;min-height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:800;padding:0}
+  .qty span{min-width:26px;text-align:center;font-weight:700;font-family:"IBM Plex Mono",monospace}
+  .badge{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;border-radius:999px;padding:3px 9px;vertical-align:middle}
+  .badge.overdue{background:var(--danger-bg);color:var(--danger)}
+  .badge.soon{background:var(--gold-bg);color:var(--gold)}
+  .badge.okb{background:var(--ok-bg);color:var(--ok)}
+  .badge.paid{background:var(--surface2);color:var(--muted)}
+  .empty{padding:22px 8px;text-align:center;color:var(--muted)}
+  .empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin:18px 2px 6px}
+  .section-head h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0}
+  .linkbtn{border:none;background:none;color:var(--accent);font-weight:800;min-height:40px;padding:0 6px;font-size:14px}
+  .group-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 2px 2px}
+  .totalrow{display:flex;justify-content:space-between;align-items:baseline;padding:10px 2px 0}
+  .totalrow .t{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:600}
+
+  /* bottom tabs */
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:20}
+  nav.tabs button{flex:1;border:none;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:800;padding:6px 0 4px;min-height:56px;border-radius:12px;position:relative}
+  nav.tabs button svg{width:24px;height:24px}
+  nav.tabs button[aria-selected="true"]{color:var(--accent)}
+  nav.tabs .count{position:absolute;top:2px;right:calc(50% - 26px);background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:800;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+  nav.tabs .count.goldc{background:var(--gold);color:#fff}
+
+  /* meal plan */
+  .search-input{width:100%;min-height:52px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font-size:17px}
+  .search-input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  .search-field{position:relative}
+  .search-field .search-input{padding-right:50px}
+  .search-clear{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:38px;height:38px;border:none;border-radius:50%;background:var(--surface2);color:var(--ink);font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+  .search-clear:active{background:var(--line)}
+  #mealDetailCard{position:relative}
+  #mealDetailCard h2{padding-right:46px}
+  .detail-close{position:absolute;top:10px;right:10px;width:38px;height:38px;border:none;border-radius:50%;background:var(--surface2);color:var(--ink);font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+  .detail-close:active{background:var(--line)}
+  .meal-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .meal-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px;min-height:60px;color:var(--ink)}
+  .meal-row:active{background:var(--surface2)}
+  .meal-row.selected{border-color:var(--accent);background:var(--ok-bg)}
+  .meal-row .m-main{flex:1;min-width:0}
+  .meal-row .m-name{font-weight:800;font-size:17px}
+  .meal-row .m-meta{font-size:13px;color:var(--muted)}
+  .meal-row .chev{color:var(--muted);font-size:22px;font-weight:700;flex:0 0 auto}
+  .ing-list{list-style:none;margin:0;padding:0}
+  .ing-list li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:16px}
+  .ing-list li:last-child{border-bottom:none}
+  .ing-list .ing-name{flex:1;min-width:0;font-weight:600}
+  .btn.block{width:100%;margin-top:14px;font-size:17px;min-height:54px}
+  .btn:disabled{opacity:.55;cursor:default}
+
+  /* shopping trip mode */
+  .trip-overlay{position:fixed;inset:0;background:var(--bg);z-index:25;display:flex;flex-direction:column}
+  .trip-head{background:var(--surface);border-bottom:1px solid var(--line);padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
+  .trip-head h2{margin:0;font-size:22px;font-weight:800}
+  .trip-progress{height:10px;background:var(--surface2);border-radius:999px;overflow:hidden;margin-top:10px}
+  .trip-progress div{height:100%;background:var(--accent);border-radius:999px;transition:width .25s}
+  @media (prefers-reduced-motion: reduce){.trip-progress div{transition:none}}
+  .trip-list{flex:1;overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+  .trip-item{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:18px 16px;min-height:84px;color:var(--ink);box-shadow:var(--shadow)}
+  .trip-item .t-check{flex:0 0 auto;width:56px;height:56px;border-radius:50%;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;color:transparent;background:var(--surface)}
+  .trip-item .t-check svg{width:28px;height:28px}
+  .trip-item .t-main{flex:1;min-width:0}
+  .trip-item .t-name{font-size:21px;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+  .trip-item .t-qty{font-size:15px;color:var(--muted);font-weight:700}
+  .trip-item.done{opacity:.6}
+  .trip-item.done .t-check{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .trip-item.done .t-name{text-decoration:line-through}
+  .trip-group{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:8px 2px 0}
+  .trip-foot{background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px}
+  .trip-foot .btn{flex:1;min-height:56px;font-size:17px;padding:0 10px}
+  @media (max-width:560px){ nav.tabs button{font-size:11px} }
+
+  /* find deals */
+  .deal-pick{background:var(--ok-bg);border:1.5px solid var(--accent);border-radius:14px;padding:16px;margin:0 0 6px}
+  .deal-pick .pick-kicker{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin:0 0 4px}
+  .deal-pick .pick-store{font-size:24px;font-weight:800;line-height:1.2;margin:0;letter-spacing:-.01em}
+  .deal-pick .pick-meta{font-size:14px;color:var(--ink);margin:6px 0 0}
+  .flyer-label{font-size:13px;font-weight:700;color:var(--muted);margin:0 0 12px}
+  .store-block{border-top:1px solid var(--line);padding:14px 0 6px}
+  .store-block:first-of-type{border-top:none}
+  .store-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .store-head h3{font-size:17px;font-weight:800;margin:0}
+  .store-head .store-meta{font-size:13px;color:var(--muted);font-weight:700;text-align:right}
+  .store-head .store-meta .t{font-family:"IBM Plex Mono",monospace;color:var(--ink)}
+  .store-dates{font-size:12px;color:var(--muted);margin:2px 0 0}
+  .deal-rows{list-style:none;margin:8px 0 0;padding:0}
+  .deal-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .deal-row:last-child{border-bottom:none}
+  .deal-row .d-main{flex:1;min-width:0}
+  .deal-row .d-item{font-weight:800;font-size:15px;overflow-wrap:anywhere}
+  .deal-row .d-deal{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+  .deal-row .d-price{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:15px;white-space:nowrap;text-align:right}
+  .deal-row .d-price .d-qty{display:block;font-size:12px;color:var(--muted);font-weight:600}
+  .not-sale{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+  .not-sale li{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700}
+  .deal-note{font-size:13px;color:var(--muted);margin:12px 0 0}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:96px;background:var(--ink);color:var(--bg);font-weight:700;font-size:14px;padding:12px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:30;max-width:88vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="dateline" id="dateline">Thursday, November 19, 2026</p>
+
+  <div class="summary" aria-label="At a glance">
+    <div class="stat"><div class="num" id="statGroceries">0</div><div class="lab">To get</div></div>
+    <div class="stat"><div class="num" id="statBills">$0</div><div class="lab">Bills unpaid</div></div>
+    <div class="stat"><div class="num" id="statBudget">$0</div><div class="lab">Spent in Nov</div></div>
+  </div>
+
+  <!-- ============ GROCERIES ============ -->
+  <section class="panel active" id="panel-groceries" aria-label="Groceries">
+    <div class="card">
+      <h2>Groceries</h2>
+      <p class="sub">Add things the moment you think of them. Tap the circle when an item's in the cart.</p>
+      <form class="addrow" id="groceryForm">
+        <input type="text" id="groceryInput" placeholder="Type an item — e.g. coffee" autocomplete="off" enterkeyhint="done" aria-label="Grocery item" />
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <p class="dictate-hint">Tip: tap the mic on your phone's keyboard to dictate.</p>
+      <p class="chips-label">Quick add</p>
+      <div class="chips" id="quickChips"></div>
+      <p class="chips-label">In the store</p>
+      <button class="btn gold block" id="startTrip" type="button" style="margin-top:8px">Start shopping trip</button>
+      <p class="sub" style="margin:8px 2px 0">Trip mode makes the list big and simple — tap each item as it goes in the cart.</p>
+      <p class="chips-label">Before you go</p>
+      <button class="btn block" id="findDeals" type="button" style="margin-top:8px">Find the best store for this list</button>
+      <p class="sub" style="margin:8px 2px 0">Checks your list against this week's flyer deals and picks one store — most items on sale wins, lowest total breaks the tie. Flyer prices Nov 19–25, 2026.</p>
+    </div>
+
+    <div class="card hidden" id="dealsCard">
+      <h2>Best store for this list</h2>
+      <p class="flyer-label">Flyer prices Nov 19–25, 2026</p>
+      <div id="dealsBody"></div>
+    </div>
+
+    <div class="card">
+      <div id="groceryEmpty" class="empty">
+        <strong>List is empty</strong>
+        Nothing on the list yet — type above to add your first item.
+      </div>
+      <ul class="items" id="groceryList"></ul>
+      <div id="doneWrap" class="hidden">
+        <div class="section-head">
+          <h3 id="doneHead">In the cart</h3>
+          <button class="linkbtn" id="clearDone" type="button">Clear checked</button>
+        </div>
+        <ul class="items" id="groceryDoneList"></ul>
+      </div>
+      <div class="section-head" id="copyWrap">
+        <h3 id="groceryCount"></h3>
+        <button class="linkbtn" id="copyList" type="button">Copy list</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MEAL PLAN ============ -->
+  <section class="panel" id="panel-meals" aria-label="Meal plan">
+    <div class="card">
+      <h2>Meal plan</h2>
+      <p class="sub">Start typing a meal and matches pop up. Tap one to break down its ingredients, then add what's missing to your grocery list.</p>
+      <div class="fieldrow">
+        <span class="field grow search-field"><input type="text" class="search-input" id="mealSearch" placeholder="Try “tacos”, “chicken”, “pasta”…" autocomplete="off" enterkeyhint="search" aria-label="Search meals" /><button class="search-clear hidden" id="mealClearBtn" type="button" aria-label="Clear meal search">×</button></span>
+      </div>
+      <p class="dictate-hint">Tip: tap the mic on your phone's keyboard to dictate.</p>
+      <p class="sub" id="mealCount" style="margin:10px 2px 0"></p>
+      <div class="meal-list" id="mealList"></div>
+    </div>
+    <div class="card hidden" id="mealDetailCard">
+      <button class="detail-close" id="mealDetailClose" type="button" aria-label="Close meal details">×</button>
+      <h2 id="mealDetailName"></h2>
+      <p class="sub" id="mealDetailMeta"></p>
+      <ul class="ing-list" id="mealIngList"></ul>
+      <p class="sub" id="mealAddNote" style="margin-top:12px;margin-bottom:0"></p>
+      <button class="btn block" id="mealAddBtn" type="button">Add missing ingredients to list</button>
+      <button class="btn secondary block" id="mealViewListBtn" type="button">View grocery list</button>
+      <button class="btn secondary block" id="mealCloseBtn" type="button">Close</button>
+    </div>
+  </section>
+
+  <!-- ============ BILLS ============ -->
+  <section class="panel" id="panel-bills" aria-label="Bills">
+    <div class="card">
+      <h2>Bills</h2>
+      <p class="sub">Due dates at a glance. Tap the circle when a bill is paid.</p>
+      <div class="totalrow" style="padding-top:0">
+        <span style="font-weight:700;color:var(--muted);font-size:14px">Still to pay</span>
+        <span class="t" id="billsTotal">$0.00</span>
+      </div>
+      <p class="sub" id="billsNext" style="margin-top:6px"></p>
+    </div>
+    <div class="card">
+      <form id="billForm" class="formgrid">
+        <div class="fieldrow">
+          <span class="field grow"><label for="billName">Bill</label><input type="text" id="billName" placeholder="e.g. SaskPower" autocomplete="off" /></span>
+        </div>
+        <p class="dictate-hint" style="margin-top:0">Tip: tap the mic on your phone's keyboard to dictate.</p>
+        <div class="two">
+          <span class="field amt"><label for="billAmount">Amount ($)</label><input type="number" id="billAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal" /></span>
+          <span class="field"><label for="billDue">Due</label><input type="date" id="billDue" /></span>
+        </div>
+        <span class="field"><label for="billRepeat">Repeats</label>
+          <select id="billRepeat">
+            <option value="once">One time</option>
+            <option value="monthly" selected>Monthly</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </span>
+        <button class="btn" type="submit">Add bill</button>
+      </form>
+    </div>
+    <div class="card">
+      <div id="billEmpty" class="empty">
+        <strong>No bills yet</strong>
+        Add your first bill above — power, phone, mortgage, whatever's coming due.
+      </div>
+      <ul class="items" id="billList"></ul>
+    </div>
+  </section>
+
+  <!-- ============ CALORIES ============ -->
+  <section class="panel" id="panel-calories" aria-label="Calories">
+    <div class="card">
+      <h2>Calories</h2>
+      <p class="sub">Type what you ate — the app roughs out the calories from common foods and logs it for today.</p>
+      <div class="totalrow" style="padding-top:0">
+        <span style="font-weight:700;color:var(--muted);font-size:14px">Today's total</span>
+        <span class="t" id="calTodayTotal">0 cal</span>
+      </div>
+      <p class="sub" id="calTodayCount" style="margin-top:6px"></p>
+    </div>
+    <div class="card">
+      <form id="calorieForm" class="formgrid">
+        <div class="fieldrow">
+          <span class="field grow"><label for="calFood">What did you eat?</label><input type="text" id="calFood" placeholder="e.g. two eggs and toast" autocomplete="off" /></span>
+        </div>
+        <p class="dictate-hint" style="margin-top:0">Tip: tap the mic on your phone's keyboard to dictate.</p>
+        <span class="field"><label for="calManual">Calories (optional — leave blank to estimate)</label><input type="number" id="calManual" placeholder="Auto-estimate" min="0" step="1" inputmode="numeric" /></span>
+        <button class="btn" type="submit">Log food</button>
+      </form>
+      <p class="sub" style="margin-top:12px;margin-bottom:0">Estimates are rough — based on typical servings of common foods.</p>
+    </div>
+    <div class="card">
+      <div id="calorieEmpty" class="empty">
+        <strong>Nothing logged yet</strong>
+        Type above to log your first meal or snack.
+      </div>
+      <div id="calorieGroups"></div>
+    </div>
+  </section>
+
+  <!-- ============ BUDGET ============ -->
+  <section class="panel" id="panel-budget" aria-label="Budget">
+    <div class="card">
+      <h2>Budget</h2>
+      <p class="sub">Log a purchase the second you make it, so nothing slips by.</p>
+      <div class="summary" style="margin:4px 0 14px">
+        <div class="stat" style="box-shadow:none"><div class="num" id="budWeek">$0</div><div class="lab">This week</div></div>
+        <div class="stat" style="box-shadow:none"><div class="num" id="budMonth">$0</div><div class="lab" id="budMonthLab">This month</div></div>
+        <div class="stat" style="box-shadow:none"><div class="num" id="budCount">0</div><div class="lab">Purchases</div></div>
+      </div>
+      <form id="budgetForm" class="formgrid">
+        <div class="fieldrow">
+          <div class="two grow">
+            <span class="field"><label for="budWhat">What / where</label><input type="text" id="budWhat" placeholder="e.g. Costco" autocomplete="off" /></span>
+            <span class="field amt"><label for="budAmount">Amount ($)</label><input type="number" id="budAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal" /></span>
+          </div>
+        </div>
+        <p class="dictate-hint" style="margin-top:0">Tip: tap the mic on your phone's keyboard to dictate.</p>
+        <span class="field"><label for="budCat">Category</label>
+          <select id="budCat">
+            <option>Groceries</option><option>Gas &amp; vehicle</option><option>Eating out</option>
+            <option>House</option><option>Kids</option><option>Fun</option><option>Other</option>
+          </select>
+        </span>
+        <button class="btn gold" type="submit">Add purchase</button>
+      </form>
+    </div>
+    <div class="card">
+      <div id="budgetEmpty" class="empty">
+        <strong>Nothing logged yet</strong>
+        Your purchases will show up here, itemized, with the running total.
+      </div>
+      <div id="budgetGroups"></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" id="tabbtn-groceries" aria-selected="true" data-tab="groceries">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1.6"/><circle cx="19" cy="21" r="1.6"/><path d="M2.5 3h2l2.6 12.5a2 2 0 0 0 2 1.5h8.9a2 2 0 0 0 2-1.6L21.5 7H6"/></svg>
+    Groceries<span class="count hidden" id="badgeGroceries">0</span>
+  </button>
+  <button role="tab" id="tabbtn-meals" aria-selected="false" data-tab="meals">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+    Meals
+  </button>
+  <button role="tab" id="tabbtn-bills" aria-selected="false" data-tab="bills">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/></svg>
+    Bills<span class="count hidden" id="badgeBills">0</span>
+  </button>
+  <button role="tab" id="tabbtn-budget" aria-selected="false" data-tab="budget">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+    Budget<span class="count goldc hidden" id="badgeBudget">0</span>
+  </button>
+  <button role="tab" id="tabbtn-calories" aria-selected="false" data-tab="calories">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.4 0 7.5-3 7.5-7.2 0-3-1.9-5.4-3.6-7.3C14.3 5.7 13 4 13 2c-3 2-4.5 4.4-4.6 7C6.9 10.2 4.5 12.3 4.5 14.8 4.5 19 7.6 22 12 22z"/><path d="M12 22c-1.9 0-3.2-1.3-3.2-3 0-1.3.8-2.3 1.7-3.2.5-.5 1-1 1.5-1.8.4.8.9 1.3 1.4 1.9.6.8 1.3 1.7 1.3 3.1 0 1.7-1.2 3-2.7 3z"/></svg>
+    Calories<span class="count hidden" id="badgeCalories">0</span>
+  </button>
+</nav>
+
+<!-- ============ SHOPPING TRIP MODE ============ -->
+<div class="trip-overlay hidden" id="tripOverlay" role="dialog" aria-modal="true" aria-label="Shopping trip">
+  <div class="trip-head">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <h2>Shopping trip</h2>
+      <button class="btn secondary small" id="tripClose" type="button" style="min-height:44px">Done</button>
+    </div>
+    <p class="sub" id="tripProgressText" style="margin:6px 0 0"></p>
+    <div class="trip-progress"><div id="tripProgressBar" style="width:0%"></div></div>
+  </div>
+  <div class="trip-list" id="tripList"></div>
+  <div class="trip-foot">
+    <button class="btn secondary" id="tripClearDone" type="button">Clear checked</button>
+    <button class="btn" id="tripFinish" type="button">Finish trip</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "groceries-and-bills-v1";
+  var state = { groceries: [], bills: [], purchases: [], calories: [] };
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) { var p = JSON.parse(raw); if (p && typeof p === "object") { state.groceries = p.groceries||[]; state.bills = p.bills||[]; state.purchases = p.purchases||[]; state.calories = p.calories||[]; } }
+  } catch(e) {}
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function money(n){ return "$" + Number(n||0).toLocaleString("en-CA",{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function moneyShort(n){ n = Number(n||0); return n % 1 === 0 ? "$" + n.toLocaleString("en-CA") : money(n); }
+  function esc(s){ var d = document.createElement("div"); d.textContent = String(s==null?"":s); return d.innerHTML; }
+  function todayLocal(){ var d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function parseDateInput(v){ if(!v) return null; var p = v.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+  function fmtDate(d){ return d.toLocaleDateString("en-CA",{month:"short", day:"numeric"}); }
+
+  var toastTimer = null;
+  function toast(msg){
+    var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2400);
+  }
+
+  /* dateline */
+  document.getElementById("dateline").textContent = new Date().toLocaleDateString("en-CA",{weekday:"long", month:"long", day:"numeric", year:"numeric"});
+
+  /* ---------- tabs ---------- */
+  var tabBtns = document.querySelectorAll("nav.tabs button");
+  tabBtns.forEach(function(b){
+    b.addEventListener("click", function(){
+      tabBtns.forEach(function(x){ x.setAttribute("aria-selected","false"); });
+      b.setAttribute("aria-selected","true");
+      document.querySelectorAll(".panel").forEach(function(pn){ pn.classList.remove("active"); });
+      document.getElementById("panel-" + b.getAttribute("data-tab")).classList.add("active");
+      window.scrollTo(0,0);
+    });
+  });
+  function switchTab(name){ document.getElementById("tabbtn-" + name).click(); }
+
+  /* ---------- groceries ---------- */
+  var QUICK = ["Milk","Eggs","Bread","Butter","Cheese","Coffee","Chicken","Ground beef","Bananas","Potatoes","Onions","Dish soap"];
+  var chipsEl = document.getElementById("quickChips");
+  QUICK.forEach(function(q){
+    var c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = "+ " + q;
+    c.addEventListener("click", function(){ addGrocery(q); });
+    chipsEl.appendChild(c);
+  });
+
+  function addGrocery(name, qty){
+    name = String(name||"").trim();
+    if (!name) return false;
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    var existing = null;
+    state.groceries.forEach(function(g){ if (!g.done && g.name.toLowerCase() === name.toLowerCase()) existing = g; });
+    if (existing) { existing.qty = (existing.qty||1) + (qty||1); }
+    else state.groceries.unshift({ id: uid(), name: name, qty: qty||1, done: false });
+    save(); render();
+    return true;
+  }
+  document.getElementById("groceryForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var inp = document.getElementById("groceryInput");
+    if (addGrocery(inp.value)) { inp.value = ""; inp.focus(); toast("Added to the list"); }
+  });
+  document.getElementById("clearDone").addEventListener("click", function(){
+    state.groceries = state.groceries.filter(function(g){ return !g.done; });
+    save(); render(); toast("Checked items cleared");
+  });
+  document.getElementById("copyList").addEventListener("click", function(){
+    var todo = state.groceries.filter(function(g){ return !g.done; });
+    if (!todo.length) { toast("Nothing to copy — the list is empty"); return; }
+    var text = "Grocery list:\n" + todo.map(function(g){ return "• " + g.name + (g.qty>1 ? " ×" + g.qty : ""); }).join("\n");
+    function done(){ toast("List copied — paste it anywhere"); }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text); done(); }); }
+    else { fallbackCopy(text); done(); }
+  });
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch(e) {} document.body.removeChild(ta);
+  }
+
+  /* ---------- meal plan ---------- */
+  /* Built-in library of common family meals and the groceries each one needs */
+  var MEALS = [
+    { name:"Spaghetti & Meatballs", cat:"Pasta", time:"40 min", serves:4, ingredients:["Spaghetti","Ground beef","Breadcrumbs","Eggs","Parmesan cheese","Pasta sauce","Garlic","Onions"] },
+    { name:"Spaghetti", cat:"Pasta", time:"30 min", serves:4, ingredients:["Spaghetti","Ground beef","Pasta sauce","Onions","Garlic","Italian seasoning","Parmesan cheese","Garlic bread"] },
+    { name:"Beef Tacos", cat:"Mexican", time:"25 min", serves:4, ingredients:["Ground beef","Taco shells","Taco seasoning","Lettuce","Tomatoes","Cheddar cheese","Sour cream","Salsa"] },
+    { name:"Chicken Tacos", cat:"Mexican", time:"25 min", serves:4, ingredients:["Chicken breasts","Tortillas","Taco seasoning","Lettuce","Tomatoes","Cheddar cheese","Sour cream","Limes"] },
+    { name:"Burgers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Ground beef","Burger buns","Cheddar cheese","Lettuce","Tomatoes","Onions","Pickles","Ketchup"] },
+    { name:"Grilled Cheese & Tomato Soup", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Bread","Cheddar cheese","Butter","Tomato soup"] },
+    { name:"Macaroni & Cheese (Homemade Mac & Cheese)", cat:"Pasta", time:"30 min", serves:4, ingredients:["Macaroni","Cheddar cheese","Milk","Butter","Flour","Parmesan cheese"] },
+    { name:"Chicken Stir Fry", cat:"Asian", time:"30 min", serves:4, ingredients:["Chicken breasts","Broccoli","Bell peppers","Soy sauce","Rice","Garlic","Ginger"] },
+    { name:"Beef Stir Fry", cat:"Asian", time:"30 min", serves:4, ingredients:["Stir fry beef","Broccoli","Bell peppers","Soy sauce","Rice","Garlic"] },
+    { name:"Sheet Pan Chicken & Veggies", cat:"One pan", time:"45 min", serves:4, ingredients:["Chicken thighs","Potatoes","Carrots","Broccoli","Olive oil","Garlic"] },
+    { name:"Roast Chicken Dinner", cat:"Sunday dinner", time:"1 hr 30 min", serves:5, ingredients:["Whole chicken","Potatoes","Carrots","Onions","Butter","Gravy mix"] },
+    { name:"Pork Chops & Green Beans", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Pork chops","Potatoes","Green beans","Applesauce"] },
+    { name:"Meatloaf & Mashed Potatoes", cat:"Comfort food", time:"1 hr 10 min", serves:5, ingredients:["Ground beef","Breadcrumbs","Eggs","Onions","Ketchup","Milk","Potatoes","Butter"] },
+    { name:"Lasagna", cat:"Pasta", time:"1 hr 15 min", serves:6, ingredients:["Lasagna noodles","Ground beef","Pasta sauce","Ricotta cheese","Mozzarella cheese","Parmesan cheese"] },
+    { name:"Chicken Alfredo Pasta", cat:"Pasta", time:"30 min", serves:4, ingredients:["Fettuccine","Chicken breasts","Heavy cream","Parmesan cheese","Garlic","Butter","Broccoli"] },
+    { name:"Beef Chili", cat:"Comfort food", time:"50 min", serves:6, ingredients:["Ground beef","Kidney beans","Black beans","Diced tomatoes","Onions","Chili powder","Cheddar cheese","Sour cream"] },
+    { name:"Chicken Noodle Soup", cat:"Soup", time:"40 min", serves:5, ingredients:["Chicken breasts","Egg noodles","Carrots","Celery","Onions","Chicken broth"] },
+    { name:"Breakfast for Dinner", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Eggs","Bacon","Bread","Hash browns","Orange juice"] },
+    { name:"Eggs & Bacon", cat:"Breakfast", time:"15 min", serves:4, ingredients:["Eggs","Bacon","Bread","Butter","Hash browns","Cheddar cheese","Orange juice"] },
+    { name:"Pancakes & Bacon", cat:"Breakfast", time:"20 min", serves:4, ingredients:["Pancake mix","Eggs","Milk","Bacon","Maple syrup","Butter"] },
+    { name:"French Toast", cat:"Breakfast", time:"15 min", serves:4, ingredients:["Bread","Eggs","Milk","Cinnamon","Maple syrup","Butter"] },
+    { name:"Omelettes", cat:"Breakfast", time:"15 min", serves:4, ingredients:["Eggs","Cheddar cheese","Ham","Bell peppers","Onions","Mushrooms"] },
+    { name:"Homemade Pizza Night", cat:"Family favourite", time:"35 min", serves:4, ingredients:["Pizza dough","Pizza sauce","Mozzarella cheese","Pepperoni","Bell peppers","Mushrooms"] },
+    { name:"Chicken Quesadillas", cat:"Mexican", time:"20 min", serves:4, ingredients:["Tortillas","Cheddar cheese","Chicken breasts","Bell peppers","Sour cream","Salsa"] },
+    { name:"Beef Burritos", cat:"Mexican", time:"30 min", serves:4, ingredients:["Tortillas","Ground beef","Rice","Black beans","Cheddar cheese","Lettuce","Salsa","Sour cream"] },
+    { name:"Chicken Fajitas", cat:"Mexican", time:"30 min", serves:4, ingredients:["Chicken breasts","Bell peppers","Onions","Tortillas","Fajita seasoning","Sour cream","Limes"] },
+    { name:"Butter Chicken & Naan", cat:"Indian", time:"40 min", serves:4, ingredients:["Chicken thighs","Butter chicken sauce","Heavy cream","Butter","Rice","Naan bread","Ginger","Garlic"] },
+    { name:"Chicken Curry & Rice", cat:"Indian", time:"40 min", serves:4, ingredients:["Chicken breasts","Curry powder","Coconut milk","Rice","Onions","Potatoes"] },
+    { name:"Shepherd's Pie", cat:"Comfort food", time:"55 min", serves:5, ingredients:["Ground beef","Potatoes","Frozen peas","Carrots","Onions","Beef broth","Butter","Milk"] },
+    { name:"Pot Roast", cat:"Sunday dinner", time:"3 hr", serves:5, ingredients:["Beef roast","Potatoes","Carrots","Onions","Beef broth","Garlic"] },
+    { name:"Pulled Pork Sandwiches", cat:"Slow cooker", time:"6 hr", serves:6, ingredients:["Pork shoulder","BBQ sauce","Burger buns","Coleslaw mix"] },
+    { name:"Sloppy Joes", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Ground beef","Burger buns","Onions","Bell peppers","Sloppy joe sauce"] },
+    { name:"Hot Dogs & Fries", cat:"BBQ & grill", time:"20 min", serves:4, ingredients:["Hot dogs","Hot dog buns","French fries","Ketchup","Mustard","Cheddar cheese"] },
+    { name:"Fish & Chips", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Fish fillets","French fries","Tartar sauce","Lemons","Coleslaw mix"] },
+    { name:"Salmon, Rice & Broccoli", cat:"Weeknight", time:"25 min", serves:4, ingredients:["Salmon fillets","Rice","Broccoli","Lemons","Garlic","Butter"] },
+    { name:"Tuna Melts", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Canned tuna","Bread","Cheddar cheese","Mayonnaise","Celery"] },
+    { name:"Chicken Caesar Wraps", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Chicken breasts","Tortillas","Romaine lettuce","Caesar dressing","Parmesan cheese","Bacon"] },
+    { name:"BLT Sandwiches", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Bacon","Bread","Lettuce","Tomatoes","Mayonnaise"] },
+    { name:"Chicken Parmesan", cat:"Pasta", time:"45 min", serves:4, ingredients:["Chicken breasts","Breadcrumbs","Mozzarella cheese","Parmesan cheese","Pasta sauce","Spaghetti"] },
+    { name:"Chicken Enchiladas", cat:"Mexican", time:"40 min", serves:4, ingredients:["Tortillas","Chicken breasts","Enchilada sauce","Cheddar cheese","Onions","Sour cream"] },
+    { name:"Chicken Fried Rice", cat:"Asian", time:"25 min", serves:4, ingredients:["Rice","Eggs","Frozen peas","Carrots","Soy sauce","Green onions","Chicken breasts"] },
+    { name:"Sausage & Perogies (Perogies & Sausage)", cat:"Comfort food", time:"25 min", serves:4, ingredients:["Perogies","Sausage","Onions","Sour cream","Bacon","Butter"] },
+    { name:"Steak & Potatoes", cat:"BBQ & grill", time:"35 min", serves:4, ingredients:["Steak","Potatoes","Green beans","Butter","Garlic"] },
+    { name:"Sausage & Pepper Pasta", cat:"Pasta", time:"30 min", serves:4, ingredients:["Italian sausage","Penne","Bell peppers","Onions","Pasta sauce","Parmesan cheese"] },
+    { name:"Chicken Pot Pie", cat:"Comfort food", time:"50 min", serves:5, ingredients:["Chicken breasts","Pie crust","Frozen peas","Carrots","Potatoes","Onions","Chicken broth","Milk","Butter","Flour"] },
+    { name:"Beef Stew", cat:"Comfort food", time:"2 hr", serves:6, ingredients:["Stewing beef","Potatoes","Carrots","Onions","Celery","Beef broth","Tomato paste","Garlic"] },
+    { name:"Vegetable Soup", cat:"Soup", time:"40 min", serves:6, ingredients:["Diced tomatoes","Carrots","Celery","Onions","Green beans","Potatoes","Vegetable broth","Frozen corn"] },
+    { name:"Pesto Pasta", cat:"Pasta", time:"20 min", serves:4, ingredients:["Penne","Pesto sauce","Cherry tomatoes","Parmesan cheese","Garlic bread"] },
+    { name:"Spaghetti Carbonara", cat:"Pasta", time:"25 min", serves:4, ingredients:["Spaghetti","Bacon","Eggs","Parmesan cheese","Garlic","Frozen peas"] },
+    { name:"Baked Ziti", cat:"Pasta", time:"45 min", serves:6, ingredients:["Ziti pasta","Pasta sauce","Ricotta cheese","Mozzarella cheese","Ground beef","Parmesan cheese"] },
+    { name:"Stuffed Peppers", cat:"Weeknight", time:"50 min", serves:4, ingredients:["Bell peppers","Ground beef","Rice","Diced tomatoes","Onions","Cheddar cheese","Tomato sauce"] },
+    { name:"Cabbage Rolls", cat:"Comfort food", time:"1 hr 20 min", serves:6, ingredients:["Cabbage","Ground beef","Rice","Onions","Tomato sauce","Diced tomatoes","Garlic"] },
+    { name:"Chicken and Dumplings", cat:"Comfort food", time:"50 min", serves:5, ingredients:["Chicken thighs","Carrots","Celery","Onions","Chicken broth","Flour","Milk","Butter","Frozen peas"] },
+    { name:"Turkey Dinner", cat:"Sunday dinner", time:"2 hr", serves:6, ingredients:["Whole turkey","Potatoes","Carrots","Stuffing mix","Gravy mix","Cranberry sauce","Butter"] },
+    { name:"Glazed Ham Dinner", cat:"Sunday dinner", time:"1 hr 20 min", serves:6, ingredients:["Ham","Brown sugar","Potatoes","Green beans","Pineapple","Butter"] },
+    { name:"BBQ Ribs", cat:"BBQ & grill", time:"2 hr 30 min", serves:4, ingredients:["Pork ribs","BBQ sauce","Coleslaw mix","Corn on the cob","Baked beans"] },
+    { name:"Grilled BBQ Chicken", cat:"BBQ & grill", time:"40 min", serves:4, ingredients:["Chicken thighs","BBQ sauce","Corn on the cob","Potatoes","Coleslaw mix"] },
+    { name:"Steak Fajitas", cat:"Mexican", time:"30 min", serves:4, ingredients:["Steak","Bell peppers","Onions","Tortillas","Fajita seasoning","Sour cream","Limes"] },
+    { name:"Shrimp Scampi Pasta", cat:"Seafood", time:"25 min", serves:4, ingredients:["Shrimp","Linguine","Garlic","Butter","Lemons","Parmesan cheese","Parsley"] },
+    { name:"Garlic Butter Shrimp & Rice", cat:"Seafood", time:"20 min", serves:4, ingredients:["Shrimp","Rice","Garlic","Butter","Broccoli","Lemons"] },
+    { name:"Fish Tacos", cat:"Mexican", time:"25 min", serves:4, ingredients:["Fish fillets","Tortillas","Cabbage","Limes","Mayonnaise","Cilantro","Salsa"] },
+    { name:"BBQ Chicken Wings", cat:"BBQ & grill", time:"45 min", serves:4, ingredients:["Chicken wings","BBQ sauce","Celery","Ranch dressing","Carrots"] },
+    { name:"Meatball Subs", cat:"Quick & easy", time:"30 min", serves:4, ingredients:["Frozen meatballs","Sub buns","Pasta sauce","Mozzarella cheese","Parmesan cheese"] },
+    { name:"Philly Cheesesteak Sandwiches", cat:"Quick & easy", time:"25 min", serves:4, ingredients:["Shaved beef","Sub buns","Bell peppers","Onions","Provolone cheese","Mushrooms"] },
+    { name:"Club Sandwiches", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Bread","Turkey slices","Ham","Bacon","Lettuce","Tomatoes","Mayonnaise","Cheddar cheese"] },
+    { name:"Tuna Casserole", cat:"Comfort food", time:"35 min", serves:5, ingredients:["Egg noodles","Canned tuna","Cream of mushroom soup","Frozen peas","Cheddar cheese","Breadcrumbs","Milk"] },
+    { name:"Cheeseburger Skillet", cat:"One pan", time:"25 min", serves:4, ingredients:["Ground beef","Macaroni","Cheddar cheese","Diced tomatoes","Onions","Milk","Ketchup","Mustard"] },
+    { name:"American Goulash", cat:"Pasta", time:"35 min", serves:6, ingredients:["Ground beef","Macaroni","Diced tomatoes","Tomato sauce","Onions","Bell peppers","Cheddar cheese","Garlic"] },
+    { name:"Beef and Broccoli", cat:"Asian", time:"25 min", serves:4, ingredients:["Stir fry beef","Broccoli","Soy sauce","Garlic","Ginger","Rice","Brown sugar"] },
+    { name:"Sweet and Sour Chicken", cat:"Asian", time:"30 min", serves:4, ingredients:["Chicken breasts","Bell peppers","Pineapple","Sweet and sour sauce","Rice","Onions"] },
+    { name:"Orange Chicken", cat:"Asian", time:"30 min", serves:4, ingredients:["Chicken breasts","Orange juice","Soy sauce","Cornstarch","Rice","Broccoli","Green onions"] },
+    { name:"Sesame Chicken", cat:"Asian", time:"30 min", serves:4, ingredients:["Chicken breasts","Soy sauce","Honey","Sesame seeds","Cornstarch","Rice","Broccoli"] },
+    { name:"Chicken Pad Thai", cat:"Asian", time:"30 min", serves:4, ingredients:["Rice noodles","Chicken breasts","Eggs","Peanuts","Bean sprouts","Green onions","Limes","Pad thai sauce"] },
+    { name:"Chicken Lo Mein", cat:"Asian", time:"25 min", serves:4, ingredients:["Lo mein noodles","Chicken breasts","Soy sauce","Carrots","Cabbage","Green onions","Garlic","Ginger"] },
+    { name:"Vegetable Lo Mein", cat:"Asian", time:"20 min", serves:4, ingredients:["Lo mein noodles","Broccoli","Carrots","Bell peppers","Soy sauce","Garlic","Mushrooms"] },
+    { name:"Veggie Fried Rice", cat:"Asian", time:"20 min", serves:4, ingredients:["Rice","Eggs","Frozen peas","Carrots","Soy sauce","Green onions","Garlic"] },
+    { name:"Wonton Soup", cat:"Soup", time:"25 min", serves:4, ingredients:["Frozen wontons","Chicken broth","Bok choy","Green onions","Soy sauce","Ginger","Garlic"] },
+    { name:"Corn Chowder", cat:"Soup", time:"35 min", serves:5, ingredients:["Frozen corn","Potatoes","Bacon","Onions","Milk","Chicken broth","Celery","Butter"] },
+    { name:"Loaded Potato Soup", cat:"Soup", time:"40 min", serves:5, ingredients:["Potatoes","Bacon","Cheddar cheese","Sour cream","Green onions","Milk","Chicken broth","Butter"] },
+    { name:"Broccoli Cheddar Soup", cat:"Soup", time:"30 min", serves:4, ingredients:["Broccoli","Cheddar cheese","Milk","Heavy cream","Onions","Carrots","Butter","Flour"] },
+    { name:"Minestrone Soup", cat:"Soup", time:"40 min", serves:6, ingredients:["Diced tomatoes","Kidney beans","Pasta shells","Carrots","Celery","Onions","Vegetable broth","Spinach"] },
+    { name:"Lentil Soup", cat:"Soup", time:"45 min", serves:6, ingredients:["Lentils","Carrots","Celery","Onions","Diced tomatoes","Vegetable broth","Garlic","Cumin"] },
+    { name:"Split Pea & Ham Soup", cat:"Soup", time:"1 hr", serves:6, ingredients:["Split peas","Ham","Carrots","Onions","Celery","Chicken broth"] },
+    { name:"Clam Chowder", cat:"Soup", time:"35 min", serves:4, ingredients:["Canned clams","Potatoes","Bacon","Onions","Celery","Heavy cream","Milk","Butter"] },
+    { name:"French Onion Soup", cat:"Soup", time:"50 min", serves:4, ingredients:["Onions","Beef broth","Baguette","Swiss cheese","Butter","Thyme"] },
+    { name:"Chicken Tortilla Soup", cat:"Soup", time:"35 min", serves:5, ingredients:["Chicken breasts","Black beans","Frozen corn","Diced tomatoes","Tortilla chips","Chicken broth","Avocado","Cheddar cheese"] },
+    { name:"White Chicken Chili", cat:"Comfort food", time:"40 min", serves:6, ingredients:["Chicken breasts","White beans","Green chilies","Onions","Chicken broth","Sour cream","Cheddar cheese","Cumin"] },
+    { name:"Turkey Chili", cat:"Comfort food", time:"45 min", serves:6, ingredients:["Ground turkey","Kidney beans","Black beans","Diced tomatoes","Onions","Chili powder","Bell peppers"] },
+    { name:"Vegetarian Chili", cat:"Vegetarian", time:"45 min", serves:6, ingredients:["Black beans","Kidney beans","Diced tomatoes","Bell peppers","Onions","Frozen corn","Chili powder","Sweet potatoes"] },
+    { name:"Jambalaya", cat:"One pan", time:"45 min", serves:6, ingredients:["Rice","Chicken thighs","Italian sausage","Shrimp","Bell peppers","Onions","Celery","Diced tomatoes","Cajun seasoning"] },
+    { name:"Chicken Marsala", cat:"Weeknight", time:"35 min", serves:4, ingredients:["Chicken breasts","Mushrooms","Chicken broth","Butter","Flour","Pasta","Garlic"] },
+    { name:"Chicken Piccata", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Chicken breasts","Lemons","Capers","Butter","Flour","Pasta","Parsley"] },
+    { name:"Beef Stroganoff", cat:"Comfort food", time:"35 min", serves:4, ingredients:["Stir fry beef","Egg noodles","Mushrooms","Onions","Sour cream","Beef broth","Butter","Flour"] },
+    { name:"Salisbury Steak", cat:"Comfort food", time:"40 min", serves:4, ingredients:["Ground beef","Breadcrumbs","Onions","Mushrooms","Beef broth","Ketchup","Potatoes","Butter"] },
+    { name:"Swedish Meatballs", cat:"Comfort food", time:"40 min", serves:4, ingredients:["Frozen meatballs","Egg noodles","Heavy cream","Beef broth","Butter","Flour"] },
+    { name:"Stuffed Shells", cat:"Pasta", time:"50 min", serves:5, ingredients:["Pasta shells","Ricotta cheese","Mozzarella cheese","Parmesan cheese","Pasta sauce","Spinach","Eggs"] },
+    { name:"Cheese Ravioli", cat:"Pasta", time:"20 min", serves:4, ingredients:["Cheese ravioli","Pasta sauce","Mozzarella cheese","Parmesan cheese","Garlic bread","Spinach"] },
+    { name:"Tortellini Alfredo", cat:"Pasta", time:"20 min", serves:4, ingredients:["Cheese tortellini","Heavy cream","Parmesan cheese","Garlic","Butter","Frozen peas","Bacon"] },
+    { name:"Breakfast Burritos", cat:"Breakfast", time:"20 min", serves:4, ingredients:["Tortillas","Eggs","Sausage","Cheddar cheese","Bell peppers","Onions","Hash browns","Salsa"] },
+    { name:"Breakfast Casserole", cat:"Breakfast", time:"50 min", serves:6, ingredients:["Eggs","Sausage","Hash browns","Cheddar cheese","Milk","Bell peppers","Onions"] },
+    { name:"Biscuits and Gravy", cat:"Breakfast", time:"25 min", serves:4, ingredients:["Biscuit mix","Sausage","Milk","Flour","Butter","Eggs"] },
+    { name:"Waffles & Berries", cat:"Breakfast", time:"20 min", serves:4, ingredients:["Waffle mix","Eggs","Milk","Strawberries","Blueberries","Whipped cream","Maple syrup","Butter"] },
+    { name:"Quiche Lorraine", cat:"Breakfast", time:"55 min", serves:4, ingredients:["Pie crust","Eggs","Heavy cream","Bacon","Swiss cheese","Onions"] },
+    { name:"Veggie Frittata", cat:"Breakfast", time:"25 min", serves:4, ingredients:["Eggs","Bell peppers","Spinach","Tomatoes","Feta cheese","Onions","Potatoes"] },
+    { name:"Chicken Caesar Salad", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Chicken breasts","Romaine lettuce","Caesar dressing","Parmesan cheese","Croutons","Bacon","Lemons"] },
+    { name:"Cobb Salad", cat:"Quick & easy", time:"25 min", serves:4, ingredients:["Chicken breasts","Eggs","Bacon","Avocado","Tomatoes","Lettuce","Blue cheese","Ranch dressing"] },
+    { name:"Taco Salad", cat:"Mexican", time:"20 min", serves:4, ingredients:["Ground beef","Taco seasoning","Lettuce","Tomatoes","Cheddar cheese","Tortilla chips","Sour cream","Salsa"] },
+    { name:"Greek Chicken Salad", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Chicken breasts","Lettuce","Cucumbers","Tomatoes","Red onions","Feta cheese","Olives","Greek dressing"] },
+    { name:"Chef Salad", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Lettuce","Ham","Turkey slices","Eggs","Cheddar cheese","Tomatoes","Cucumbers","Ranch dressing"] },
+    { name:"Chicken Bacon Ranch Pasta", cat:"Pasta", time:"30 min", serves:4, ingredients:["Penne","Chicken breasts","Bacon","Ranch seasoning","Heavy cream","Cheddar cheese","Frozen peas"] },
+    { name:"Cajun Chicken Pasta", cat:"Pasta", time:"30 min", serves:4, ingredients:["Penne","Chicken breasts","Cajun seasoning","Heavy cream","Bell peppers","Parmesan cheese","Garlic"] },
+    { name:"Tuscan Chicken", cat:"One pan", time:"35 min", serves:4, ingredients:["Chicken breasts","Sun-dried tomatoes","Spinach","Heavy cream","Parmesan cheese","Garlic","Pasta"] },
+    { name:"Honey Garlic Chicken", cat:"One pan", time:"30 min", serves:4, ingredients:["Chicken thighs","Honey","Garlic","Soy sauce","Rice","Broccoli"] },
+    { name:"Lemon Garlic Chicken", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Chicken breasts","Lemons","Garlic","Butter","Rice","Green beans","Chicken broth"] },
+    { name:"Baked Parmesan Chicken", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Chicken breasts","Parmesan cheese","Breadcrumbs","Eggs","Marinara sauce","Mozzarella cheese","Pasta"] },
+    { name:"Pork Tenderloin Dinner", cat:"Sunday dinner", time:"50 min", serves:4, ingredients:["Pork tenderloin","Potatoes","Carrots","Apples","Onions","Dijon mustard","Honey"] },
+    { name:"Sausage & Sauerkraut", cat:"Weeknight", time:"25 min", serves:4, ingredients:["Sausage","Sauerkraut","Potatoes","Onions","Apples","Butter"] },
+    { name:"Bratwurst & Peppers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Bratwurst","Bell peppers","Onions","Hot dog buns","Mustard","Sauerkraut"] },
+    { name:"Kielbasa & Potato Skillet", cat:"One pan", time:"30 min", serves:4, ingredients:["Kielbasa","Potatoes","Bell peppers","Onions","Garlic","Cheddar cheese"] },
+    { name:"Ham & Cheese Sliders", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Dinner rolls","Ham","Swiss cheese","Butter","Dijon mustard"] },
+    { name:"Turkey Melts", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Bread","Turkey slices","Cheddar cheese","Tomatoes","Mayonnaise","Bacon"] },
+    { name:"Reuben Sandwiches", cat:"Quick & easy", time:"20 min", serves:4, ingredients:["Rye bread","Corned beef","Sauerkraut","Swiss cheese","Thousand island dressing","Butter"] },
+    { name:"Egg Salad Sandwiches", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Eggs","Bread","Mayonnaise","Celery","Mustard","Lettuce"] },
+    { name:"Chicken Salad Sandwiches", cat:"Quick & easy", time:"15 min", serves:4, ingredients:["Chicken breasts","Bread","Mayonnaise","Celery","Grapes","Lettuce"] },
+    { name:"Shrimp Fried Rice", cat:"Asian", time:"25 min", serves:4, ingredients:["Shrimp","Rice","Eggs","Frozen peas","Carrots","Soy sauce","Green onions"] },
+    { name:"Teriyaki Chicken", cat:"Asian", time:"25 min", serves:4, ingredients:["Chicken thighs","Teriyaki sauce","Rice","Broccoli","Sesame seeds","Green onions"] },
+    { name:"Teriyaki Salmon", cat:"Asian", time:"20 min", serves:4, ingredients:["Salmon fillets","Teriyaki sauce","Rice","Broccoli","Sesame seeds"] },
+    { name:"Baked Cod Dinner", cat:"Seafood", time:"25 min", serves:4, ingredients:["Cod fillets","Breadcrumbs","Lemons","Potatoes","Green beans","Butter","Tartar sauce"] },
+    { name:"Crab Cakes", cat:"Seafood", time:"30 min", serves:4, ingredients:["Crab meat","Breadcrumbs","Eggs","Mayonnaise","Dijon mustard","Lemons","Tartar sauce"] },
+    { name:"Linguine with Clam Sauce", cat:"Pasta", time:"25 min", serves:4, ingredients:["Linguine","Canned clams","Garlic","Butter","Parsley","Parmesan cheese","Lemons"] },
+    { name:"Chicken Shawarma Wraps", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Chicken thighs","Pita bread","Shawarma seasoning","Lettuce","Tomatoes","Red onions","Garlic sauce","Cucumbers"] },
+    { name:"Beef Shawarma Wraps", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Stir fry beef","Pita bread","Shawarma seasoning","Lettuce","Tomatoes","Red onions","Hummus"] },
+    { name:"Falafel Wraps", cat:"Vegetarian", time:"25 min", serves:4, ingredients:["Falafel mix","Pita bread","Lettuce","Tomatoes","Cucumbers","Hummus","Red onions"] },
+    { name:"Veggie Burgers", cat:"Vegetarian", time:"20 min", serves:4, ingredients:["Veggie burger patties","Burger buns","Lettuce","Tomatoes","Cheddar cheese","Mayonnaise","Pickles"] },
+    { name:"Black Bean Burgers", cat:"Vegetarian", time:"25 min", serves:4, ingredients:["Black beans","Breadcrumbs","Eggs","Onions","Burger buns","Cheddar cheese","Lettuce","Tomatoes"] },
+    { name:"Mushroom Swiss Burgers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Ground beef","Burger buns","Mushrooms","Swiss cheese","Onions","Lettuce","Mayonnaise"] },
+    { name:"Bacon Cheeseburgers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Ground beef","Burger buns","Bacon","Cheddar cheese","Lettuce","Tomatoes","Onions","Pickles"] },
+    { name:"Turkey Burgers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Ground turkey","Burger buns","Lettuce","Tomatoes","Cheddar cheese","Mayonnaise","Red onions"] },
+    { name:"Chicken Burgers", cat:"BBQ & grill", time:"25 min", serves:4, ingredients:["Ground chicken","Burger buns","Lettuce","Tomatoes","Cheddar cheese","Mayonnaise","Pickles"] },
+    { name:"Pulled Chicken Sandwiches", cat:"Slow cooker", time:"4 hr", serves:6, ingredients:["Chicken breasts","BBQ sauce","Burger buns","Coleslaw mix","Pickles"] },
+    { name:"Beef Dip Sandwiches", cat:"Slow cooker", time:"6 hr", serves:5, ingredients:["Beef roast","Sub buns","Beef broth","Onions","Provolone cheese","Garlic"] },
+    { name:"Italian Beef Sandwiches", cat:"Slow cooker", time:"6 hr", serves:5, ingredients:["Beef roast","Sub buns","Beef broth","Italian seasoning","Provolone cheese","Bell peppers"] },
+    { name:"Chicken & Rice Casserole", cat:"Comfort food", time:"50 min", serves:5, ingredients:["Chicken breasts","Rice","Cream of chicken soup","Cheddar cheese","Broccoli","Milk"] },
+    { name:"Tater Tot Casserole", cat:"Comfort food", time:"45 min", serves:5, ingredients:["Ground beef","Tater tots","Cream of mushroom soup","Cheddar cheese","Frozen corn","Milk"] },
+    { name:"Scalloped Potatoes & Ham", cat:"Comfort food", time:"1 hr", serves:6, ingredients:["Potatoes","Ham","Milk","Flour","Butter","Cheddar cheese","Onions"] },
+    { name:"Perogies Casserole", cat:"Comfort food", time:"40 min", serves:5, ingredients:["Perogies","Sausage","Cream of mushroom soup","Cheddar cheese","Onions","Sour cream","Bacon"] },
+    { name:"Cabbage & Noodles", cat:"Comfort food", time:"25 min", serves:4, ingredients:["Egg noodles","Cabbage","Onions","Bacon","Butter","Sour cream"] },
+    { name:"Egg Roll in a Bowl", cat:"One pan", time:"20 min", serves:4, ingredients:["Ground pork","Coleslaw mix","Soy sauce","Garlic","Ginger","Green onions","Rice"] },
+    { name:"Broccoli Cheese Casserole", cat:"Vegetarian", time:"40 min", serves:5, ingredients:["Broccoli","Rice","Cheddar cheese","Cream of mushroom soup","Milk","Breadcrumbs","Butter"] },
+    { name:"Western Omelette & Hash Browns", cat:"Breakfast", time:"20 min", serves:4, ingredients:["Eggs","Ham","Bell peppers","Onions","Cheddar cheese","Hash browns","Bread"] },
+    { name:"Slow Cooker Beef Barbacoa", cat:"Slow cooker", time:"8 hr", serves:6, ingredients:["Beef chuck roast","Chipotle peppers in adobo","Limes","Garlic","Onions","Beef broth","Cumin","Tortillas"] },
+    { name:"Slow Cooker Taco Soup", cat:"Slow cooker", time:"6 hr", serves:6, ingredients:["Ground beef","Black beans","Kidney beans","Frozen corn","Diced tomatoes","Taco seasoning","Onions","Cheddar cheese"] },
+    { name:"Slow Cooker Honey Garlic Pork", cat:"Slow cooker", time:"6 hr", serves:5, ingredients:["Pork shoulder","Honey","Soy sauce","Garlic","Rice","Broccoli","Green onions"] },
+    { name:"Slow Cooker Beef & Barley Soup", cat:"Slow cooker", time:"8 hr", serves:6, ingredients:["Stewing beef","Barley","Carrots","Celery","Onions","Beef broth","Tomato paste","Garlic"] },
+    { name:"Slow Cooker Chicken Cacciatore", cat:"Slow cooker", time:"6 hr", serves:5, ingredients:["Chicken thighs","Diced tomatoes","Bell peppers","Onions","Mushrooms","Italian seasoning","Spaghetti"] },
+    { name:"Slow Cooker Ham & Bean Soup", cat:"Slow cooker", time:"8 hr", serves:6, ingredients:["Ham","White beans","Carrots","Onions","Celery","Chicken broth","Thyme","Bread"] },
+    { name:"Slow Cooker Meatballs in Marinara", cat:"Slow cooker", time:"4 hr", serves:5, ingredients:["Frozen meatballs","Pasta sauce","Sub buns","Mozzarella cheese","Parmesan cheese","Garlic bread"] },
+    { name:"Slow Cooker Creamy Chicken & Wild Rice Soup", cat:"Slow cooker", time:"6 hr", serves:6, ingredients:["Chicken breasts","Wild rice","Carrots","Celery","Onions","Chicken broth","Heavy cream","Milk"] },
+    { name:"Sheet Pan Sausage & Potatoes", cat:"One pan", time:"40 min", serves:4, ingredients:["Italian sausage","Potatoes","Bell peppers","Onions","Olive oil","Garlic"] },
+    { name:"Sheet Pan Lemon Herb Salmon", cat:"One pan", time:"25 min", serves:4, ingredients:["Salmon fillets","Lemons","Green beans","Potatoes","Olive oil","Garlic"] },
+    { name:"Sheet Pan BBQ Chicken & Sweet Potatoes", cat:"One pan", time:"40 min", serves:4, ingredients:["Chicken thighs","BBQ sauce","Sweet potatoes","Red onions","Broccoli","Olive oil"] },
+    { name:"Sheet Pan Shrimp Fajitas", cat:"One pan", time:"20 min", serves:4, ingredients:["Shrimp","Bell peppers","Onions","Tortillas","Fajita seasoning","Limes","Sour cream"] },
+    { name:"Sheet Pan Meatballs & Roasted Veggies", cat:"One pan", time:"35 min", serves:4, ingredients:["Frozen meatballs","Zucchini","Bell peppers","Potatoes","Olive oil","Parmesan cheese"] },
+    { name:"Sheet Pan Gnocchi & Sausage", cat:"One pan", time:"30 min", serves:4, ingredients:["Potato gnocchi","Italian sausage","Cherry tomatoes","Spinach","Olive oil","Parmesan cheese"] },
+    { name:"Chicken Nuggets & Fries", cat:"Kid-friendly", time:"25 min", serves:4, ingredients:["Chicken breasts","Breadcrumbs","Eggs","French fries","Ketchup","Honey mustard","Carrots"] },
+    { name:"Mini Pizzas (English Muffin Pizzas)", cat:"Kid-friendly", time:"20 min", serves:4, ingredients:["English muffins","Pizza sauce","Mozzarella cheese","Pepperoni","Bell peppers","Pineapple"] },
+    { name:"Mac & Cheese Hot Dogs", cat:"Kid-friendly", time:"25 min", serves:4, ingredients:["Macaroni","Cheddar cheese","Milk","Butter","Hot dogs","Hot dog buns","Ketchup"] },
+    { name:"Pizza Quesadillas", cat:"Kid-friendly", time:"20 min", serves:4, ingredients:["Tortillas","Pizza sauce","Mozzarella cheese","Pepperoni","Mushrooms","Garlic bread"] },
+    { name:"Corn Dog Muffins", cat:"Kid-friendly", time:"30 min", serves:6, ingredients:["Cornbread mix","Hot dogs","Eggs","Milk","Cheddar cheese","Ketchup","Mustard"] },
+    { name:"Taco Cups", cat:"Kid-friendly", time:"30 min", serves:4, ingredients:["Ground beef","Taco seasoning","Wonton wrappers","Cheddar cheese","Lettuce","Tomatoes","Sour cream","Salsa"] },
+    { name:"Chicken Tenders & Dipping Sauces", cat:"Kid-friendly", time:"30 min", serves:4, ingredients:["Chicken breasts","Breadcrumbs","Eggs","Flour","French fries","BBQ sauce","Ranch dressing","Honey mustard"] },
+    { name:"Butter Noodles & Meatballs", cat:"Kid-friendly", time:"25 min", serves:4, ingredients:["Egg noodles","Butter","Frozen meatballs","Parmesan cheese","Frozen peas","Garlic bread"] },
+    { name:"Breakfast Hash", cat:"Breakfast for dinner", time:"30 min", serves:4, ingredients:["Potatoes","Sausage","Eggs","Bell peppers","Onions","Cheddar cheese","Bread"] },
+    { name:"Egg & Cheese Breakfast Sandwiches", cat:"Breakfast for dinner", time:"15 min", serves:4, ingredients:["English muffins","Eggs","Cheddar cheese","Ham","Butter","Hash browns","Orange juice"] },
+    { name:"Cinnamon French Toast Bake", cat:"Breakfast for dinner", time:"45 min", serves:6, ingredients:["Bread","Eggs","Milk","Cinnamon","Brown sugar","Maple syrup","Butter","Strawberries"] },
+    { name:"Breakfast Tacos", cat:"Breakfast for dinner", time:"20 min", serves:4, ingredients:["Tortillas","Eggs","Sausage","Cheddar cheese","Salsa","Potatoes","Avocado"] },
+    { name:"Dutch Baby Pancake", cat:"Breakfast for dinner", time:"30 min", serves:4, ingredients:["Eggs","Milk","Flour","Butter","Strawberries","Blueberries","Maple syrup","Powdered sugar"] },
+    { name:"Ham & Egg Fried Rice", cat:"Breakfast for dinner", time:"20 min", serves:4, ingredients:["Rice","Eggs","Ham","Frozen peas","Carrots","Soy sauce","Green onions","Garlic"] },
+    { name:"Cream of Mushroom Soup", cat:"Soup", time:"35 min", serves:4, ingredients:["Mushrooms","Onions","Garlic","Chicken broth","Heavy cream","Butter","Flour","Bread"] },
+    { name:"Beef & Vegetable Soup", cat:"Soup", time:"1 hr", serves:6, ingredients:["Stewing beef","Potatoes","Carrots","Celery","Onions","Diced tomatoes","Beef broth","Barley"] },
+    { name:"Chicken & Wild Rice Soup", cat:"Soup", time:"45 min", serves:5, ingredients:["Chicken breasts","Wild rice","Carrots","Celery","Onions","Chicken broth","Milk","Butter"] },
+    { name:"Hamburger Soup", cat:"Soup", time:"40 min", serves:6, ingredients:["Ground beef","Potatoes","Carrots","Celery","Onions","Diced tomatoes","Beef broth","Barley"] },
+    { name:"Zuppa Toscana", cat:"Soup", time:"40 min", serves:5, ingredients:["Italian sausage","Potatoes","Kale","Onions","Chicken broth","Heavy cream","Garlic","Bacon"] },
+    { name:"Creamy Tomato Tortellini Soup", cat:"Soup", time:"30 min", serves:5, ingredients:["Cheese tortellini","Diced tomatoes","Onions","Garlic","Chicken broth","Heavy cream","Spinach","Parmesan cheese"] },
+    { name:"Borscht", cat:"Soup", time:"1 hr 10 min", serves:6, ingredients:["Beets","Potatoes","Carrots","Cabbage","Onions","Beef broth","Sour cream","Dill"] },
+    { name:"Chicken Corn Chowder", cat:"Soup", time:"40 min", serves:5, ingredients:["Chicken breasts","Frozen corn","Potatoes","Bacon","Onions","Milk","Chicken broth","Celery"] },
+    { name:"Perogies & Fried Onions", cat:"Prairie favourite", time:"30 min", serves:4, ingredients:["Perogies","Onions","Butter","Sour cream","Bacon","Cheddar cheese"] },
+    { name:"Farmer Sausage & Sauerkraut", cat:"Prairie favourite", time:"35 min", serves:4, ingredients:["Farmer sausage","Sauerkraut","Potatoes","Onions","Mustard","Rye bread"] },
+    { name:"Cabbage Roll Casserole", cat:"Prairie favourite", time:"50 min", serves:6, ingredients:["Cabbage","Ground beef","Rice","Onions","Tomato sauce","Diced tomatoes","Cheddar cheese","Sour cream"] },
+    { name:"Bison Burgers", cat:"Prairie favourite", time:"25 min", serves:4, ingredients:["Ground bison","Burger buns","Cheddar cheese","Lettuce","Tomatoes","Onions","Pickles","Mustard"] },
+    { name:"Pickerel (Walleye) Fish Fry", cat:"Prairie favourite", time:"30 min", serves:4, ingredients:["Walleye fillets","Flour","Eggs","Breadcrumbs","Lemons","Tartar sauce","French fries","Coleslaw mix"] },
+    { name:"Roast Beef & Yorkshire Pudding", cat:"Sunday dinner", time:"2 hr", serves:6, ingredients:["Beef roast","Potatoes","Carrots","Onions","Beef broth","Yorkshire pudding mix","Horseradish","Gravy mix"] },
+    { name:"Saskatchewan Lentil Stew", cat:"Prairie favourite", time:"50 min", serves:6, ingredients:["Lentils","Carrots","Celery","Onions","Potatoes","Diced tomatoes","Vegetable broth","Sausage"] },
+    { name:"Tourtière (French-Canadian Meat Pie)", cat:"Prairie favourite", time:"1 hr 15 min", serves:6, ingredients:["Ground pork","Ground beef","Potatoes","Onions","Pie crust","Cloves","Cinnamon","Ketchup"] },
+    { name:"One-Pan Creamy Tuscan Salmon", cat:"One pan", time:"25 min", serves:4, ingredients:["Salmon fillets","Sun-dried tomatoes","Spinach","Heavy cream","Garlic","Parmesan cheese","Pasta"] },
+    { name:"Chicken & Broccoli Alfredo Bake", cat:"One pan", time:"40 min", serves:5, ingredients:["Chicken breasts","Penne","Broccoli","Alfredo sauce","Mozzarella cheese","Parmesan cheese","Garlic bread"] },
+    { name:"Beef & Bean Burrito Bowls", cat:"Weeknight", time:"25 min", serves:4, ingredients:["Ground beef","Rice","Black beans","Frozen corn","Lettuce","Tomatoes","Cheddar cheese","Sour cream"] },
+    { name:"Garlic Butter Steak Bites & Potatoes", cat:"One pan", time:"30 min", serves:4, ingredients:["Steak","Potatoes","Garlic","Butter","Green beans","Rosemary"] },
+    { name:"Creamy Garlic Chicken & Mushrooms", cat:"Weeknight", time:"30 min", serves:4, ingredients:["Chicken breasts","Mushrooms","Garlic","Heavy cream","Chicken broth","Pasta","Parmesan cheese"] },
+    { name:"Taco Pasta Skillet", cat:"One pan", time:"30 min", serves:4, ingredients:["Ground beef","Pasta shells","Taco seasoning","Diced tomatoes","Cheddar cheese","Sour cream","Lettuce","Tortilla chips"] }
+  ];
+  var selectedMeal = null;
+  function normName(s){
+    return String(s||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim().replace(/s\b/g,"");
+  }
+  function onList(name){
+    var n = normName(name);
+    return state.groceries.some(function(g){ return normName(g.name) === n; });
+  }
+  function missingFor(meal){
+    return meal.ingredients.filter(function(ing){ return !onList(ing); });
+  }
+  function renderMeals(){
+    var searchEl = document.getElementById("mealSearch");
+    var q = searchEl.value.toLowerCase().trim();
+    document.getElementById("mealClearBtn").classList.toggle("hidden", !searchEl.value);
+    var list = document.getElementById("mealList"); list.innerHTML = "";
+    if (!q) {
+      /* Empty box means empty state: no results, and no detail card left open. */
+      selectedMeal = null;
+      renderMealDetail();
+      document.getElementById("mealCount").textContent = MEALS.length + " family meals built in — start typing above and matches show up here as you type.";
+      return;
+    }
+    var matches = MEALS.filter(function(m){
+      var hay = (m.name + " " + m.cat + " " + m.ingredients.join(" ")).toLowerCase();
+      return q.split(/\s+/).every(function(tok){ return hay.indexOf(tok) !== -1; });
+    });
+    document.getElementById("mealCount").textContent = matches.length ? matches.length + (matches.length === 1 ? " match" : " matches") + " — tap one for its ingredients." : "";
+    if (!matches.length) {
+      var d = document.createElement("div"); d.className = "empty";
+      d.innerHTML = "<strong>No meals match that</strong>Try “chicken”, “beef”, “pasta” or “tacos”.";
+      list.appendChild(d); return;
+    }
+    matches.forEach(function(m){
+      var b = document.createElement("button"); b.type = "button";
+      b.className = "meal-row" + (selectedMeal && selectedMeal.name === m.name ? " selected" : "");
+      b.setAttribute("aria-expanded", selectedMeal && selectedMeal.name === m.name ? "true" : "false");
+      b.innerHTML = '<span class="m-main"><span class="m-name">' + esc(m.name) + '</span><br><span class="m-meta">' + esc(m.cat) + " · " + esc(m.time) + " · Serves " + m.serves + " · " + m.ingredients.length + ' ingredients</span></span><span class="chev" aria-hidden="true">›</span>';
+      b.addEventListener("click", function(){
+        selectedMeal = m;
+        renderMeals(); renderMealDetail();
+        document.getElementById("mealDetailCard").scrollIntoView({ block:"start" });
+      });
+      list.appendChild(b);
+    });
+  }
+  function renderMealDetail(){
+    var card = document.getElementById("mealDetailCard");
+    if (!selectedMeal) { card.classList.add("hidden"); return; }
+    card.classList.remove("hidden");
+    document.getElementById("mealDetailName").textContent = selectedMeal.name;
+    document.getElementById("mealDetailMeta").textContent = selectedMeal.cat + " · " + selectedMeal.time + " · Serves " + selectedMeal.serves + " — here's what it takes:";
+    var ul = document.getElementById("mealIngList"); ul.innerHTML = "";
+    selectedMeal.ingredients.forEach(function(ing){
+      var have = onList(ing);
+      var li = document.createElement("li");
+      li.innerHTML = '<span class="ing-name">' + esc(ing) + "</span>" + (have ? '<span class="badge okb">On your list</span>' : '<span class="badge soon">To add</span>');
+      ul.appendChild(li);
+    });
+    var missing = missingFor(selectedMeal);
+    var haveCount = selectedMeal.ingredients.length - missing.length;
+    document.getElementById("mealAddNote").textContent = haveCount
+      ? haveCount + " of " + selectedMeal.ingredients.length + " ingredients are already on your list — the button adds only the missing ones."
+      : "None of these are on your list yet — the button adds them all.";
+    var btn = document.getElementById("mealAddBtn");
+    btn.disabled = missing.length === 0;
+    btn.textContent = missing.length ? "Add " + missing.length + " missing ingredient" + (missing.length === 1 ? "" : "s") + " to grocery list" : "Everything's already on your list";
+  }
+  /* Back out of a meal entirely: clear the search, the results and the open
+     detail, returning to the empty search state — nothing added to the list. */
+  function dismissMeal(){
+    document.getElementById("mealSearch").value = "";
+    selectedMeal = null;
+    renderMealDetail();
+    renderMeals();
+  }
+  document.getElementById("mealSearch").addEventListener("input", renderMeals);
+  document.getElementById("mealClearBtn").addEventListener("click", function(){
+    dismissMeal();
+    document.getElementById("mealSearch").focus();
+  });
+  document.getElementById("mealDetailClose").addEventListener("click", dismissMeal);
+  document.getElementById("mealCloseBtn").addEventListener("click", dismissMeal);
+  document.getElementById("mealAddBtn").addEventListener("click", function(){
+    if (!selectedMeal) return;
+    var missing = missingFor(selectedMeal);
+    if (!missing.length) { toast("Everything's already on your list"); return; }
+    missing.forEach(function(ing){ addGrocery(ing); });
+    toast("Added " + missing.length + " ingredient" + (missing.length === 1 ? "" : "s") + " for " + selectedMeal.name);
+  });
+  document.getElementById("mealViewListBtn").addEventListener("click", function(){ switchTab("groceries"); });
+
+  /* ---------- shopping trip mode ---------- */
+  var tripOpen = false;
+  function openTrip(){
+    tripOpen = true;
+    document.getElementById("tripOverlay").classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    renderTrip();
+  }
+  function closeTrip(){
+    tripOpen = false;
+    document.getElementById("tripOverlay").classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  function tripItemEl(g){
+    var b = document.createElement("button"); b.type = "button";
+    b.className = "trip-item" + (g.done ? " done" : "");
+    b.setAttribute("aria-label", (g.done ? "Put back: " : "Got it: ") + g.name);
+    b.innerHTML = '<span class="t-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="t-main"><span class="t-name">' + esc(g.name) + "</span>" + ((g.qty||1) > 1 ? '<br><span class="t-qty">Get ' + g.qty + "</span>" : "") + "</span>";
+    b.addEventListener("click", function(){ g.done = !g.done; save(); render(); });
+    return b;
+  }
+  function renderTrip(){
+    if (!tripOpen) return;
+    var todo = state.groceries.filter(function(g){ return !g.done; });
+    var done = state.groceries.filter(function(g){ return g.done; });
+    var total = todo.length + done.length;
+    document.getElementById("tripProgressText").textContent = total === 0
+      ? "Your list is empty."
+      : (done.length + " of " + total + " in the cart" + (todo.length ? " — " + todo.length + " to go. Tap an item when it's in the cart." : " — all done!"));
+    document.getElementById("tripProgressBar").style.width = total ? Math.round(done.length / total * 100) + "%" : "0%";
+    document.getElementById("tripClearDone").disabled = done.length === 0;
+    var list = document.getElementById("tripList"); list.innerHTML = "";
+    if (total === 0) {
+      var d = document.createElement("div"); d.className = "empty";
+      d.innerHTML = "<strong>Nothing to shop for yet</strong>Add items on the Groceries tab — or pick a meal in Meal Plan — and they'll show up here, big and tappable.";
+      list.appendChild(d); return;
+    }
+    if (todo.length) {
+      var h1 = document.createElement("p"); h1.className = "trip-group"; h1.textContent = "To get (" + todo.length + ")"; list.appendChild(h1);
+      todo.forEach(function(g){ list.appendChild(tripItemEl(g)); });
+    }
+    if (done.length) {
+      var h2 = document.createElement("p"); h2.className = "trip-group"; h2.textContent = "In the cart (" + done.length + ")"; list.appendChild(h2);
+      done.forEach(function(g){ list.appendChild(tripItemEl(g)); });
+    }
+  }
+  document.getElementById("startTrip").addEventListener("click", openTrip);
+  document.getElementById("tripClose").addEventListener("click", closeTrip);
+  document.getElementById("tripFinish").addEventListener("click", function(){
+    var left = state.groceries.filter(function(g){ return !g.done; }).length;
+    closeTrip();
+    toast(left ? "Trip saved — " + left + (left === 1 ? " item" : " items") + " still on the list" : "Trip done — everything's in the cart");
+  });
+  document.getElementById("tripClearDone").addEventListener("click", function(){
+    state.groceries = state.groceries.filter(function(g){ return !g.done; });
+    save(); render(); toast("Checked items cleared");
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && tripOpen) closeTrip(); });
+
+  function groceryItemEl(g){
+    var li = document.createElement("li"); li.className = "item" + (g.done ? " done" : "");
+    var chk = document.createElement("button"); chk.className = "check"; chk.type = "button";
+    chk.setAttribute("aria-label", (g.done ? "Put back on list: " : "Check off: ") + g.name);
+    chk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    chk.addEventListener("click", function(){ g.done = !g.done; save(); render(); });
+    var main = document.createElement("div"); main.className = "main";
+    main.innerHTML = '<div class="name">' + esc(g.name) + "</div>";
+    li.appendChild(chk); li.appendChild(main);
+    if (!g.done) {
+      var q = document.createElement("div"); q.className = "qty";
+      var minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label","One less " + g.name);
+      minus.addEventListener("click", function(){ if ((g.qty||1) > 1) { g.qty--; save(); render(); } });
+      var n = document.createElement("span"); n.textContent = g.qty || 1;
+      var plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label","One more " + g.name);
+      plus.addEventListener("click", function(){ g.qty = (g.qty||1) + 1; save(); render(); });
+      q.appendChild(minus); q.appendChild(n); q.appendChild(plus); li.appendChild(q);
+    }
+    var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label","Remove " + g.name);
+    del.addEventListener("click", function(){ state.groceries = state.groceries.filter(function(x){ return x.id !== g.id; }); save(); render(); });
+    li.appendChild(del);
+    return li;
+  }
+
+  /* ---------- bills ---------- */
+  document.getElementById("billForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var name = document.getElementById("billName").value.trim();
+    var amt = parseFloat(document.getElementById("billAmount").value);
+    var due = document.getElementById("billDue").value;
+    var rep = document.getElementById("billRepeat").value;
+    if (!name) { toast("Give the bill a name first"); document.getElementById("billName").focus(); return; }
+    if (!due) { toast("Pick a due date"); return; }
+    state.bills.push({ id: uid(), name: name, amount: isNaN(amt) ? 0 : amt, due: due, repeat: rep, paid: false });
+    save(); render();
+    document.getElementById("billName").value = ""; document.getElementById("billAmount").value = "";
+    toast("Bill added");
+  });
+  function advanceDue(b){
+    var d = parseDateInput(b.due); if (!d) return b.due;
+    if (b.repeat === "monthly") d.setMonth(d.getMonth() + 1);
+    else if (b.repeat === "biweekly") d.setDate(d.getDate() + 14);
+    else if (b.repeat === "yearly") d.setFullYear(d.getFullYear() + 1);
+    else return b.due;
+    var m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function billEl(b){
+    var li = document.createElement("li"); li.className = "item" + (b.paid ? " done" : "");
+    var chk = document.createElement("button"); chk.className = "check"; chk.type = "button";
+    chk.setAttribute("aria-label", (b.paid ? "Mark unpaid: " : "Mark paid: ") + b.name);
+    chk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    chk.addEventListener("click", function(){
+      if (!b.paid) {
+        b.paid = true;
+        if (b.repeat !== "once") {
+          state.bills.push({ id: uid(), name: b.name, amount: b.amount, due: advanceDue(b), repeat: b.repeat, paid: false });
+          toast("Paid — next one added for " + fmtDate(parseDateInput(advanceDue(b))));
+        } else toast("Marked paid");
+      } else b.paid = false;
+      save(); render();
+    });
+    var main = document.createElement("div"); main.className = "main";
+    var d = parseDateInput(b.due);
+    var days = d ? Math.round((d - todayLocal()) / 86400000) : null;
+    var badge = "";
+    if (b.paid) badge = ' <span class="badge paid">Paid</span>';
+    else if (days !== null && days < 0) badge = ' <span class="badge overdue">' + Math.abs(days) + 'd overdue</span>';
+    else if (days === 0) badge = ' <span class="badge soon">Due today</span>';
+    else if (days !== null && days <= 7) badge = ' <span class="badge soon">Due in ' + days + 'd</span>';
+    else if (days !== null) badge = ' <span class="badge okb">Due in ' + days + 'd</span>';
+    var repLab = { once:"One time", monthly:"Monthly", biweekly:"Every 2 weeks", yearly:"Yearly" }[b.repeat] || "";
+    main.innerHTML = '<div class="name">' + esc(b.name) + badge + '</div><div class="meta">' + (d ? "Due " + d.toLocaleDateString("en-CA",{weekday:"short", month:"short", day:"numeric"}) : "") + " · " + repLab + "</div>";
+    var amt = document.createElement("div"); amt.className = "amount"; amt.textContent = money(b.amount);
+    var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label","Delete bill " + b.name);
+    del.addEventListener("click", function(){ state.bills = state.bills.filter(function(x){ return x.id !== b.id; }); save(); render(); });
+    li.appendChild(chk); li.appendChild(main); li.appendChild(amt); li.appendChild(del);
+    return li;
+  }
+
+  /* ---------- budget ---------- */
+  function guessCategory(label){
+    var s = label.toLowerCase();
+    if (/costco|superstore|walmart|safeway|no frills|co-op|sobeys|grocery|groceries|market/.test(s)) return "Groceries";
+    if (/gas|petro|shell|esso|fuel|tire|oil/.test(s)) return "Gas & vehicle";
+    if (/restaurant|pizza|burger|coffee|tim hortons|mcdonald|cafe|lunch|dinner/.test(s)) return "Eating out";
+    if (/home depot|canadian tire|hardware|rona/.test(s)) return "House";
+    return "Other";
+  }
+  function addPurchase(label, amount, cat){
+    label = String(label||"").trim();
+    if (!label) label = "Purchase";
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+    state.purchases.unshift({ id: uid(), label: label, amount: amount, cat: cat || guessCategory(label), ts: Date.now() });
+    save(); render();
+  }
+  document.getElementById("budgetForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var what = document.getElementById("budWhat").value;
+    var amt = parseFloat(document.getElementById("budAmount").value);
+    var cat = document.getElementById("budCat").value;
+    if (isNaN(amt) || amt <= 0) { toast("Enter the amount spent"); document.getElementById("budAmount").focus(); return; }
+    addPurchase(what, amt, cat);
+    document.getElementById("budWhat").value = ""; document.getElementById("budAmount").value = "";
+    toast("Logged " + money(amt));
+  });
+  /* ---------- calories ---------- */
+  /* Rough calories per typical serving for common foods */
+  var FOODS = [
+    ["mac and cheese",350],["peanut butter and jelly",350],["grilled cheese",440],
+    ["chicken noodle soup",150],["tomato soup",170],["french fries",365],["fries",365],["mashed potatoes",210],
+    ["potato salad",350],["caesar salad",320],["garden salad",150],["coleslaw",150],
+    ["orange juice",110],["apple juice",115],["chocolate milk",210],["protein shake",160],
+    ["ice cream",270],["apple pie",320],["cheesecake",350],["brownie",230],
+    ["egg",70],["eggs",70],["scrambled eggs",140],["fried egg",90],["boiled egg",70],
+    ["toast",80],["bread",80],["bagel",270],["muffin",380],["croissant",230],
+    ["pancake",175],["pancakes",175],["waffle",200],["waffles",200],["french toast",150],
+    ["oatmeal",150],["cereal",150],["granola",200],["porridge",150],
+    ["bacon",90],["sausage",150],["sausages",150],["ham",60],["hash browns",140],
+    ["butter",100],["jam",50],["jelly",50],["honey",60],["peanut butter",190],["cream cheese",100],
+    ["milk",120],["cheese",110],["yogurt",150],["greek yogurt",100],["cottage cheese",110],
+    ["apple",95],["banana",105],["orange",60],["pear",100],["peach",60],["grapes",60],
+    ["strawberries",50],["blueberries",85],["watermelon",90],["pineapple",80],["mango",100],
+    ["carrots",30],["broccoli",55],["corn",90],["peas",60],["green beans",30],["salad",150],
+    ["potato",160],["sweet potato",110],["rice",200],["pasta",220],["spaghetti",220],["noodles",220],
+    ["quinoa",220],["couscous",175],
+    ["chicken breast",165],["chicken",230],["turkey",170],["steak",270],["beef",250],
+    ["ground beef",250],["pork chop",220],["pork",240],["ham steak",180],["lamb",250],
+    ["salmon",200],["tuna",180],["fish",180],["shrimp",85],["crab",100],
+    ["pizza",285],["burger",550],["hamburger",550],["cheeseburger",600],["hot dog",290],
+    ["sandwich",350],["sub",450],["wrap",350],["burrito",450],["taco",170],["tacos",170],
+    ["quesadilla",500],["nachos",450],["sushi",300],["soup",150],["stew",250],["chili",290],
+    ["lasagna",350],["meatloaf",250],["fried chicken",350],["chicken wings",320],["wings",320],
+    ["chicken nuggets",280],["fish and chips",600],["poutine",500],
+    ["coffee",5],["latte",190],["cappuccino",120],["tea",0],["pop",140],["soda",140],
+    ["cola",140],["lemonade",100],["beer",150],["wine",125],["milkshake",350],["smoothie",200],
+    ["chips",150],["popcorn",90],["pretzels",110],["crackers",70],["nuts",170],
+    ["chocolate",200],["cookie",160],["cookies",160],["cake",350],["donut",260],["doughnut",260],
+    ["candy",110],["granola bar",130],["protein bar",200],["trail mix",170],
+    ["avocado",160],["hummus",100],["guacamole",150],
+    ["ketchup",15],["mayo",90],["mayonnaise",90],["ranch dressing",140],["dressing",120]
+  ];
+  var NUMWORDS = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, half:0.5, couple:2 };
+  function estimateCalories(text){
+    var t = " " + String(text||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim() + " ";
+    if (!t.trim()) return null;
+    var segments = t.split(/\s+(?:and|with)\s+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (!segments.length) segments = [t.trim()];
+    var total = 0, parts = [], foundAny = false;
+    var sorted = FOODS.slice().sort(function(a,b){ return b[0].length - a[0].length; });
+    segments.forEach(function(seg){
+      var qty = 1, rest = seg;
+      var qm = rest.match(/^(?:(\d+(?:\.\d+)?)|(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|half|couple))\s+(?:x\s+)?/);
+      if (qm) { qty = qm[1] ? parseFloat(qm[1]) : (NUMWORDS[qm[2]] || 1); rest = rest.slice(qm[0].length).trim(); }
+      var matched = null;
+      for (var i = 0; i < sorted.length; i++) {
+        var key = sorted[i][0];
+        var variants = [key, key + "s", key + "es"];
+        if (key.slice(-1) === "s") variants.push(key.slice(0,-1));
+        for (var v = 0; v < variants.length; v++) {
+          if ((" " + rest + " ").indexOf(" " + variants[v] + " ") !== -1 || rest === variants[v] || rest.indexOf(variants[v] + " ") === 0 || rest.slice(-(variants[v].length+1)) === " " + variants[v]) { matched = sorted[i]; break; }
+        }
+        if (matched) break;
+      }
+      if (matched) {
+        foundAny = true;
+        var cals = Math.round(matched[1] * qty);
+        total += cals;
+        var label = matched[0].charAt(0).toUpperCase() + matched[0].slice(1);
+        parts.push(label + (qty !== 1 ? " ×" + qty : "") + " · " + cals);
+      } else if (rest) {
+        total += 250;
+        parts.push((rest.charAt(0).toUpperCase() + rest.slice(1)) + " · ~250 (rough guess)");
+      }
+    });
+    if (!total) return null;
+    return { calories: Math.round(total), breakdown: parts.join(", "), found: foundAny };
+  }
+  function addCalorie(text, manualCal){
+    text = String(text||"").trim();
+    if (!text) return false;
+    var calories, breakdown;
+    if (manualCal && !isNaN(manualCal) && manualCal > 0) { calories = Math.round(manualCal); breakdown = "Entered by hand"; }
+    else {
+      var est = estimateCalories(text);
+      if (!est) return false;
+      calories = est.calories; breakdown = est.breakdown;
+    }
+    var label = text.charAt(0).toUpperCase() + text.slice(1);
+    state.calories.unshift({ id: uid(), label: label, calories: calories, breakdown: breakdown, ts: Date.now() });
+    save(); render();
+    return calories;
+  }
+  document.getElementById("calorieForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var foodInp = document.getElementById("calFood");
+    var manInp = document.getElementById("calManual");
+    var man = parseFloat(manInp.value);
+    var logged = addCalorie(foodInp.value, isNaN(man) ? null : man);
+    if (logged === false) { toast("Type what you ate first"); foodInp.focus(); return; }
+    foodInp.value = ""; manInp.value = "";
+    toast("Logged ~" + logged + " cal");
+  });
+
+  /* ---------- find deals: this week's flyer prices ---------- */
+  /* Flyer prices Nov 19–25, 2026 (Giant Tiger flyer Nov 18–24; Costco instant savings Nov 16–22).
+     Baked in exactly as verified — no other prices. Tags drive the keyword matching:
+     a list item is classified to one tag, and a deal matches when it carries that tag. */
+  var FLYERS = [
+    { store:"Walmart", deals:[
+      { name:"Lay's or Hardbite Chips", price:1.94, priceText:"$1.94", tags:["chips"] },
+      { name:"Christie OREO or Chips Ahoy! Cookies", price:2.98, priceText:"$2.98", tags:["cookies"] },
+      { name:"Dr. Oetker Ristorante or Casa Di Mama Pizza", price:3.98, priceText:"$3.98", tags:["pizza"] },
+      { name:"Bulk Seedless Oranges", price:2.47, priceText:"$2.47/lb", tags:["orange"] },
+      { name:"Your Fresh Market Deli Salads", price:3.27, priceText:"$3.27", tags:["salad"] },
+      { name:"Maple Leaf Prime Chicken Breasts", price:6.34, priceText:"$6.34/lb", tags:["chicken-breast","chicken"] },
+      { name:"Nescafé Rich Instant Coffee 170g", price:6.42, priceText:"$6.42", tags:["coffee"] }
+    ]},
+    { store:"Superstore", deals:[
+      { name:"Chicken Breasts", price:6.88, priceText:"$6.88/lb", tags:["chicken-breast","chicken"] },
+      { name:"Red Seedless Grapes", price:2.49, priceText:"$2.49/lb", tags:["grapes"] },
+      { name:"No Name Mild Sugar Cured Bacon", price:3.50, priceText:"$3.50", tags:["bacon"] },
+      { name:"SeaQuest Colossal Shrimp", price:6.00, priceText:"$6.00", tags:["shrimp"] },
+      { name:"Farmer's Market Yellow Onions", price:4.24, priceText:"$4.24", tags:["onion"] },
+      { name:"Schneiders or Mitchell's Pepperettes", price:6.97, priceText:"$6.97", tags:["pepperettes"] },
+      { name:"Pepperidge Farm Goldfish Crackers or Grahams", price:2.48, priceText:"$2.48", tags:["crackers"] }
+    ]},
+    { store:"Safeway", deals:[
+      { name:"Fresh Regular Ground Beef Family Size", price:4.88, priceText:"$4.88/lb", tags:["ground-beef","beef"] },
+      { name:"Compliments Whole Chicken, Drumsticks or Bone-In Thighs Family Size", price:null, priceText:"BUY 1 GET 1 FREE", tags:["whole-chicken","chicken-drumstick","chicken-thigh","chicken"] },
+      { name:"Fresh Boneless Top Sirloin Roast or Grilling Steaks", price:8.88, priceText:"$8.88/lb", tags:["steak","roast","beef"] },
+      { name:"Blueberries 170g or POM Pomegranate Arils 113g", price:2.99, priceText:"$2.99", tags:["blueberries","pomegranate"] },
+      { name:"Chapman's Ice Cream 2L or Novelties 8pk", price:4.49, priceText:"$4.49", tags:["ice-cream"] },
+      { name:"Quality Street Tin 650g", price:15.99, priceText:"$15.99", tags:["chocolate"] },
+      { name:"Compliments Raw Shrimp 71–90ct 340g", price:5.99, priceText:"$5.99", tags:["shrimp"] }
+    ]},
+    { store:"No Frills", deals:[
+      { name:"Chicken Drumsticks", price:2.49, priceText:"$2.49/lb", tags:["chicken-drumstick","chicken"] },
+      { name:"Red Seedless Grapes", price:2.49, priceText:"$2.49/lb", tags:["grapes"] },
+      { name:"Pork Tenderloin", price:3.99, priceText:"$3.99/lb", tags:["pork-tenderloin","pork"] },
+      { name:"Yop Drinkable Yogurt", price:10.00, priceText:"$10.00", tags:["yogurt"] },
+      { name:"Tide Simply, Downy, Bounce or Gain", price:6.77, priceText:"$6.77", tags:["laundry"] },
+      { name:"Maple Leaf Ready Crisp or Schneiders Bacon", price:4.00, priceText:"$4.00", tags:["bacon"] },
+      { name:"Dr. Oetker Ristorante or Casa Di Mama Pizza", price:3.47, priceText:"$3.47", tags:["pizza"] }
+    ]},
+    { store:"Co-op", deals:[
+      { name:"Boneless Pork Loin Halves", price:2.99, priceText:"$2.99/lb", tags:["pork-loin","pork"] },
+      { name:"Co-op Chicken Breasts Value Pack", price:4.49, priceText:"$4.49/lb", tags:["chicken-breast","chicken"] },
+      { name:"Campbell's Soup 12x284mL", price:11.99, priceText:"$11.99", tags:["soup"] },
+      { name:"Co-op Gold Ice Cream 4L", price:7.99, priceText:"$7.99", tags:["ice-cream"] },
+      { name:"General Mills, Kellogg's or Post Jumbo Cereal 730g–1.3kg", price:8.99, priceText:"$8.99", tags:["cereal"] },
+      { name:"Co-op Gold Peanut Butter 2kg", price:7.99, priceText:"$7.99", tags:["peanut-butter"] },
+      { name:"Co-op Centsibles Bread 570g", price:1.99, priceText:"$1.99", tags:["bread"] }
+    ]},
+    { store:"Your Independent Grocer", deals:[
+      { name:"Pork Sirloin Chops or Roast", price:2.50, priceText:"$2.50/lb", tags:["pork-chops","pork","roast"] },
+      { name:"PC Whole Chicken Air Chilled", price:2.99, priceText:"$2.99/lb", tags:["whole-chicken","chicken"] },
+      { name:"Farmer's Market Red or Russet Potatoes 10lb", price:2.00, priceText:"$2.00", tags:["potatoes"] },
+      { name:"Fresh Atlantic Salmon Fillets", price:9.99, priceText:"$9.99/lb", tags:["salmon","fish"] },
+      { name:"Lactantia Butter 454g", price:4.99, priceText:"$4.99", tags:["butter"] },
+      { name:"Greenhouse Tomatoes on the Vine or Brussels Sprouts", price:2.00, priceText:"$2.00/lb", tags:["tomatoes","brussels-sprouts"] },
+      { name:"PC Orange Juice 2.5L or Siggi's Yogurt 650–750g", price:6.50, priceText:"$6.50", tags:["orange-juice","yogurt"] }
+    ]},
+    { store:"Giant Tiger", note:"Flyer Nov 18–24, 2026", deals:[
+      { name:"Primo Pasta 454g", price:0.87, priceText:"$0.87", tags:["pasta"] },
+      { name:"Whole White Mushrooms 227g", price:1.97, priceText:"$1.97", tags:["mushrooms"] },
+      { name:"Haven Greens Lettuce Blend 113g", price:2.97, priceText:"$2.97", tags:["lettuce","salad"] },
+      { name:"Trophy Nuts 200–227g", price:1.77, priceText:"$1.77", tags:["nuts"] },
+      { name:"Catch of the Day Frozen Fish 350g", price:3.00, priceText:"$3.00", tags:["fish"] },
+      { name:"Gold Label Smoke House Bacon 375g", price:3.97, priceText:"$3.97", tags:["bacon"] },
+      { name:"Chinese Mandarins 2lb", price:3.88, priceText:"$3.88", tags:["mandarins"] }
+    ]},
+    { store:"Costco", note:"Instant savings Nov 16–22, 2026", deals:[
+      { name:"Royal Asia Honey Walnut Shrimp 907g", price:14.99, priceText:"$14.99", tags:["shrimp"] },
+      { name:"Kirkland Double Cream Brie 600g", price:8.49, priceText:"$8.49", tags:["brie","cheese"] },
+      { name:"Balderson Double Smoked Cheddar 500g", price:10.99, priceText:"$10.99", tags:["cheddar","cheese"] },
+      { name:"Kraft Smooth Peanut Butter 2kg", price:7.89, priceText:"$7.89", tags:["peanut-butter"] },
+      { name:"McCafé Autumn Blend K-Cups 80ct", price:42.99, priceText:"$42.99", tags:["coffee","coffee-pods"] },
+      { name:"High Liner English Style Cod 2kg", price:21.99, priceText:"$21.99", tags:["cod","fish"] },
+      { name:"Dempster's Original Tortillas 36x61g", price:7.99, priceText:"$7.99", tags:["tortillas"] }
+    ]},
+    { store:"Save-On-Foods", deals:[
+      { name:"Whole Frying Chicken Twin Pack", price:3.49, priceText:"$3.49/lb", tags:["whole-chicken","chicken"] },
+      { name:"Black Forest Cake 875g or 1kg", price:15.99, priceText:"$15.99", tags:["cake"] },
+      { name:"Whole Eye of Round Roast AAA Beef", price:5.99, priceText:"$5.99/lb", tags:["roast","beef"] },
+      { name:"Aqua Star Wild Sockeye Salmon Fillets 454g", price:14.99, priceText:"$14.99", tags:["salmon","fish"] },
+      { name:"Green Grapes", price:2.49, priceText:"$2.49/lb", tags:["grapes"] },
+      { name:"Chinese Mandarins 4lb", price:6.99, priceText:"$6.99", tags:["mandarins"] },
+      { name:"Breyers Creamery Style Ice Cream 1.41L", price:3.99, priceText:"$3.99", tags:["ice-cream"] }
+    ]}
+  ];
+  /* Classify a grocery list item to a deal tag by keyword, most specific first,
+     so "grapes" lands on grape deals and "peanut butter" never lands on butter. */
+  function dealTag(name){
+    var s = " " + String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim() + " ";
+    function phrase(p){ return s.indexOf(" " + p + " ") !== -1; }
+    function has(w){ return s.indexOf(" " + w + " ") !== -1; }
+    if (phrase("peanut butter")) return "peanut-butter";
+    if (phrase("orange juice")) return "orange-juice";
+    if (phrase("chicken breast") || phrase("chicken breasts")) return "chicken-breast";
+    if (has("drumstick") || has("drumsticks")) return "chicken-drumstick";
+    if (has("thigh") || has("thighs")) return "chicken-thigh";
+    if (phrase("whole chicken") || phrase("frying chicken")) return "whole-chicken";
+    if (phrase("ground beef")) return "ground-beef";
+    if (phrase("ice cream")) return "ice-cream";
+    if (phrase("brussels sprout") || phrase("brussels sprouts")) return "brussels-sprouts";
+    if (phrase("pork tenderloin")) return "pork-tenderloin";
+    if (phrase("pork loin")) return "pork-loin";
+    if (phrase("pork chop") || phrase("pork chops") || phrase("sirloin chops")) return "pork-chops";
+    if (has("k") && (phrase("k cups") || phrase("k cup"))) return "coffee-pods";
+    if (has("kcups") || has("kcup") || phrase("coffee pod") || phrase("coffee pods")) return "coffee-pods";
+    if (phrase("chips ahoy") || has("oreo") || has("cookie") || has("cookies")) return "cookies";
+    if (phrase("quality street")) return "chocolate";
+    if (has("grapes") || has("grape")) return "grapes";
+    if (has("bacon")) return "bacon";
+    if (has("shrimp") || has("prawn") || has("prawns")) return "shrimp";
+    if (has("pizza")) return "pizza";
+    if (has("chips") || has("chip")) return "chips";
+    if (has("coffee")) return "coffee";
+    if (has("onion") || has("onions")) return "onion";
+    if (has("pepperette") || has("pepperettes")) return "pepperettes";
+    if (has("goldfish") || has("cracker") || has("crackers") || has("grahams")) return "crackers";
+    if (has("blueberry") || has("blueberries")) return "blueberries";
+    if (has("pomegranate") || has("pomegranates")) return "pomegranate";
+    if (has("sirloin") || has("steak") || has("steaks")) return "steak";
+    if (has("yop") || has("yogurt") || has("yoghurt")) return "yogurt";
+    if (has("tide") || has("downy") || has("bounce") || has("gain") || has("laundry") || has("detergent")) return "laundry";
+    if (has("soup")) return "soup";
+    if (has("cereal")) return "cereal";
+    if (has("bread")) return "bread";
+    if (has("potato") || has("potatoes")) return "potatoes";
+    if (has("salmon")) return "salmon";
+    if (has("butter")) return "butter";
+    if (has("tomato") || has("tomatoes")) return "tomatoes";
+    if (has("pasta") || has("spaghetti") || has("macaroni") || has("penne") || has("linguine") || has("fettuccine")) return "pasta";
+    if (has("mushroom") || has("mushrooms")) return "mushrooms";
+    if (has("lettuce")) return "lettuce";
+    if (has("mandarin") || has("mandarins") || has("clementine") || has("clementines")) return "mandarins";
+    if (has("orange") || has("oranges")) return "orange";
+    if (has("brie")) return "brie";
+    if (has("cheddar")) return "cheddar";
+    if (has("cheese")) return "cheese";
+    if (has("tortilla") || has("tortillas")) return "tortillas";
+    if (has("cod")) return "cod";
+    if (has("fish")) return "fish";
+    if (has("nut") || has("nuts")) return "nuts";
+    if (has("chocolate") || has("chocolates") || has("candy")) return "chocolate";
+    if (has("cake")) return "cake";
+    if (has("beef")) return "beef";
+    if (has("roast")) return "roast";
+    if (has("pork")) return "pork";
+    if (has("chicken")) return "chicken";
+    if (has("salad") || has("salads") || has("greens")) return "salad";
+    return null;
+  }
+  function renderDeals(){
+    var card = document.getElementById("dealsCard");
+    var body = document.getElementById("dealsBody");
+    card.classList.remove("hidden");
+    var todo = state.groceries.filter(function(g){ return !g.done; });
+    if (!todo.length) {
+      body.innerHTML = '<div class="empty"><strong>Your list is empty</strong>Add a few items above, then tap Find the best store and it will check them against the flyer deals.</div>';
+      card.scrollIntoView({ block: "start" });
+      return;
+    }
+    var entries = todo.map(function(g){ return { item: g, tag: dealTag(g.name) }; });
+    /* Per store: for each list item, the cheapest deal in that store carrying its tag. */
+    var results = FLYERS.map(function(f){
+      var matches = [], total = 0, hasBogo = false;
+      entries.forEach(function(en){
+        if (!en.tag) return;
+        var best = null;
+        f.deals.forEach(function(d){
+          if (d.tags.indexOf(en.tag) === -1) return;
+          if (!best) { best = d; return; }
+          var bp = best.price === null ? Infinity : best.price;
+          var dp = d.price === null ? Infinity : d.price;
+          if (dp < bp) best = d;
+        });
+        if (best) {
+          matches.push({ entry: en, deal: best });
+          if (best.price === null) hasBogo = true;
+          else total += best.price * (en.item.qty || 1);
+        }
+      });
+      return { store: f.store, note: f.note || "", matches: matches, total: total, hasBogo: hasBogo };
+    });
+    var ranked = results.filter(function(r){ return r.matches.length > 0; }).sort(function(a, b){
+      if (b.matches.length !== a.matches.length) return b.matches.length - a.matches.length;
+      if (a.total !== b.total) return a.total - b.total;
+      return a.store < b.store ? -1 : 1;
+    });
+    var noMatchStores = results.filter(function(r){ return r.matches.length === 0; }).map(function(r){ return r.store; });
+    var matchedSomewhere = {};
+    ranked.forEach(function(r){ r.matches.forEach(function(m){ matchedSomewhere[m.entry.item.id] = true; }); });
+    var unmatched = entries.filter(function(en){ return !matchedSomewhere[en.item.id]; });
+
+    var html = "";
+    if (!ranked.length) {
+      html += '<div class="empty"><strong>No flyer deals match your list this week</strong>None of the items below are in the Nov 19–25 flyer table — the trip is a regular-price shop wherever you go.</div>';
+    } else {
+      var pick = ranked[0];
+      html += '<div class="deal-pick"><p class="pick-kicker">Your best bet</p>'
+        + '<p class="pick-store">Go to ' + esc(pick.store) + ' this week</p>'
+        + '<p class="pick-meta">' + pick.matches.length + ' of ' + todo.length + (todo.length === 1 ? ' item' : ' items') + ' on sale there · Est. ' + money(pick.total) + ' for the matched items'
+        + (pick.hasBogo ? ' (plus a buy-one-get-one deal — flyer lists no dollar price for it)' : '') + '</p></div>';
+    }
+    ranked.forEach(function(r, idx){
+      html += '<div class="store-block"><div class="store-head"><h3>' + (idx === 0 ? '★ ' : '') + esc(r.store) + '</h3>'
+        + '<span class="store-meta">' + r.matches.length + (r.matches.length === 1 ? ' item' : ' items') + ' on sale · <span class="t">' + money(r.total) + '</span> est.</span></div>'
+        + (r.note ? '<p class="store-dates">' + esc(r.note) + '</p>' : '')
+        + '<ul class="deal-rows">';
+      r.matches.forEach(function(m){
+        var qty = m.entry.item.qty || 1;
+        var priceCell = esc(m.deal.priceText);
+        if (m.deal.price !== null && qty > 1) priceCell += '<span class="d-qty">×' + qty + ' = ' + money(m.deal.price * qty) + '</span>';
+        else if (qty > 1) priceCell += '<span class="d-qty">×' + qty + ' on your list</span>';
+        html += '<li class="deal-row"><span class="d-main"><span class="d-item">' + esc(m.entry.item.name) + '</span><br><span class="d-deal">' + esc(m.deal.name) + '</span></span><span class="d-price">' + priceCell + '</span></li>';
+      });
+      html += '</ul></div>';
+    });
+    if (unmatched.length) {
+      html += '<div class="section-head" style="margin-top:18px"><h3>Not on sale anywhere</h3></div>'
+        + '<p class="sub" style="margin:0">These list items don\'t match any deal in this week\'s flyer table:</p>'
+        + '<ul class="not-sale">' + unmatched.map(function(en){ return '<li>' + esc(en.item.name) + '</li>'; }).join("") + '</ul>';
+    } else if (ranked.length) {
+      html += '<p class="deal-note">Every item on your list matches a deal somewhere this week.</p>';
+    }
+    if (noMatchStores.length && ranked.length) {
+      html += '<p class="deal-note">Nothing from your list is on sale at ' + esc(noMatchStores.join(", ")) + ' this week.</p>';
+    }
+    if (ranked.length) {
+      html += '<p class="deal-note">Estimated totals add up the flyer prices of the matched items only — per-lb prices counted once per item, multiplied by the quantity on your list. Ranking is most matched items first, then lowest estimated total.</p>';
+    }
+    body.innerHTML = html;
+    card.scrollIntoView({ block: "start" });
+  }
+  document.getElementById("findDeals").addEventListener("click", renderDeals);
+
+  /* ---------- render ---------- */
+  function render(){
+    /* groceries */
+    var todo = state.groceries.filter(function(g){ return !g.done; });
+    var done = state.groceries.filter(function(g){ return g.done; });
+    var gl = document.getElementById("groceryList"); gl.innerHTML = "";
+    todo.forEach(function(g){ gl.appendChild(groceryItemEl(g)); });
+    var dl = document.getElementById("groceryDoneList"); dl.innerHTML = "";
+    done.forEach(function(g){ dl.appendChild(groceryItemEl(g)); });
+    document.getElementById("groceryEmpty").classList.toggle("hidden", state.groceries.length > 0);
+    document.getElementById("doneWrap").classList.toggle("hidden", done.length === 0);
+    document.getElementById("doneHead").textContent = "In the cart (" + done.length + ")";
+    document.getElementById("groceryCount").textContent = todo.length ? todo.length + (todo.length === 1 ? " item to get" : " items to get") : "";
+    document.getElementById("copyWrap").classList.toggle("hidden", todo.length === 0);
+
+    /* bills */
+    var bl = document.getElementById("billList"); bl.innerHTML = "";
+    var sorted = state.bills.slice().sort(function(a,b){
+      if (a.paid !== b.paid) return a.paid ? 1 : -1;
+      return (a.due || "") < (b.due || "") ? -1 : 1;
+    });
+    sorted.forEach(function(b){ bl.appendChild(billEl(b)); });
+    document.getElementById("billEmpty").classList.toggle("hidden", state.bills.length > 0);
+    var unpaid = state.bills.filter(function(b){ return !b.paid; });
+    var unpaidTotal = unpaid.reduce(function(s,b){ return s + (b.amount||0); }, 0);
+    document.getElementById("billsTotal").textContent = money(unpaidTotal);
+    var next = unpaid.slice().sort(function(a,b){ return a.due < b.due ? -1 : 1; })[0];
+    document.getElementById("billsNext").textContent = next ? "Next up: " + next.name + " — " + money(next.amount) + ", due " + fmtDate(parseDateInput(next.due)) + "." : (state.bills.length ? "Everything's paid. Nice." : "");
+
+    /* budget */
+    var now = new Date();
+    var monday = todayLocal(); var dow = (monday.getDay() + 6) % 7; monday.setDate(monday.getDate() - dow);
+    var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    var weekTotal = 0, monthTotal = 0;
+    state.purchases.forEach(function(p){
+      var d = new Date(p.ts);
+      if (d >= monday) weekTotal += p.amount || 0;
+      if (d >= monthStart) monthTotal += p.amount || 0;
+    });
+    document.getElementById("budWeek").textContent = moneyShort(weekTotal);
+    document.getElementById("budMonth").textContent = moneyShort(monthTotal);
+    document.getElementById("budMonthLab").textContent = now.toLocaleDateString("en-CA",{month:"long"});
+    document.getElementById("budCount").textContent = state.purchases.length;
+
+    var groups = document.getElementById("budgetGroups"); groups.innerHTML = "";
+    document.getElementById("budgetEmpty").classList.toggle("hidden", state.purchases.length > 0);
+    var today = todayLocal(), yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    var buckets = [ {label:"Today", items:[]}, {label:"Yesterday", items:[]}, {label:"Earlier", items:[]} ];
+    state.purchases.forEach(function(p){
+      var d = new Date(p.ts); var dl2 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (dl2.getTime() === today.getTime()) buckets[0].items.push(p);
+      else if (dl2.getTime() === yest.getTime()) buckets[1].items.push(p);
+      else buckets[2].items.push(p);
+    });
+    buckets.forEach(function(bk){
+      if (!bk.items.length) return;
+      var h = document.createElement("p"); h.className = "group-label"; h.textContent = bk.label; groups.appendChild(h);
+      var ul = document.createElement("ul"); ul.className = "items";
+      bk.items.forEach(function(p){
+        var li = document.createElement("li"); li.className = "item";
+        var main = document.createElement("div"); main.className = "main";
+        var when = new Date(p.ts).toLocaleDateString("en-CA",{month:"short", day:"numeric"});
+        main.innerHTML = '<div class="name">' + esc(p.label) + '</div><div class="meta">' + esc(p.cat || "Other") + (bk.label === "Earlier" ? " · " + when : "") + "</div>";
+        var amt = document.createElement("div"); amt.className = "amount"; amt.textContent = money(p.amount);
+        var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label","Delete purchase " + p.label);
+        del.addEventListener("click", function(){ state.purchases = state.purchases.filter(function(x){ return x.id !== p.id; }); save(); render(); });
+        li.appendChild(main); li.appendChild(amt); li.appendChild(del); ul.appendChild(li);
+      });
+      groups.appendChild(ul);
+    });
+
+    /* calories */
+    var calToday = todayLocal();
+    var calYest = new Date(calToday); calYest.setDate(calYest.getDate() - 1);
+    var todayCalTotal = 0, todayCalCount = 0;
+    state.calories.forEach(function(c){
+      var d = new Date(c.ts); var dl3 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (dl3.getTime() === calToday.getTime()) { todayCalTotal += c.calories || 0; todayCalCount++; }
+    });
+    document.getElementById("calTodayTotal").textContent = todayCalTotal.toLocaleString("en-CA") + " cal";
+    document.getElementById("calTodayCount").textContent = todayCalCount ? todayCalCount + (todayCalCount === 1 ? " entry" : " entries") + " logged today." : "Nothing logged yet today.";
+    var calGroups = document.getElementById("calorieGroups"); calGroups.innerHTML = "";
+    document.getElementById("calorieEmpty").classList.toggle("hidden", state.calories.length > 0);
+    var calBuckets = [ {label:"Today", items:[], total:0}, {label:"Yesterday", items:[], total:0}, {label:"Earlier", items:[], total:0} ];
+    state.calories.forEach(function(c){
+      var d = new Date(c.ts); var dl4 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      var bk = dl4.getTime() === calToday.getTime() ? calBuckets[0] : (dl4.getTime() === calYest.getTime() ? calBuckets[1] : calBuckets[2]);
+      bk.items.push(c); bk.total += c.calories || 0;
+    });
+    calBuckets.forEach(function(bk){
+      if (!bk.items.length) return;
+      var h = document.createElement("p"); h.className = "group-label"; h.textContent = bk.label + " — " + bk.total.toLocaleString("en-CA") + " cal"; calGroups.appendChild(h);
+      var ul = document.createElement("ul"); ul.className = "items";
+      bk.items.forEach(function(c){
+        var li = document.createElement("li"); li.className = "item";
+        var main = document.createElement("div"); main.className = "main";
+        var when = new Date(c.ts).toLocaleTimeString("en-CA",{hour:"numeric", minute:"2-digit"});
+        var whenFull = new Date(c.ts).toLocaleDateString("en-CA",{month:"short", day:"numeric"}) + " · " + when;
+        main.innerHTML = '<div class="name">' + esc(c.label) + '</div><div class="meta">' + esc(c.breakdown || "") + (bk.label === "Earlier" ? (c.breakdown ? " · " : "") + whenFull : (c.breakdown ? " · " : "") + when) + "</div>";
+        var amt = document.createElement("div"); amt.className = "amount"; amt.textContent = (c.calories || 0).toLocaleString("en-CA") + " cal";
+        var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label","Delete entry " + c.label);
+        del.addEventListener("click", function(){ state.calories = state.calories.filter(function(x){ return x.id !== c.id; }); save(); render(); });
+        li.appendChild(main); li.appendChild(amt); li.appendChild(del); ul.appendChild(li);
+      });
+      calGroups.appendChild(ul);
+    });
+    var bc = document.getElementById("badgeCalories");
+    bc.textContent = todayCalCount; bc.classList.toggle("hidden", todayCalCount === 0);
+
+    /* summary + badges */
+    document.getElementById("statGroceries").textContent = todo.length;
+    document.getElementById("statBills").textContent = moneyShort(unpaidTotal);
+    document.getElementById("statBudget").textContent = moneyShort(monthTotal);
+    document.querySelector(".stat .lab:last-child");
+    var bg = document.getElementById("badgeGroceries");
+    bg.textContent = todo.length; bg.classList.toggle("hidden", todo.length === 0);
+    var bb = document.getElementById("badgeBills");
+    bb.textContent = unpaid.length; bb.classList.toggle("hidden", unpaid.length === 0);
+    var bu = document.getElementById("badgeBudget");
+    bu.textContent = state.purchases.length; bu.classList.toggle("hidden", state.purchases.length === 0);
+    /* month label in summary strip */
+    var labs = document.querySelectorAll(".summary .lab");
+    if (labs[2]) labs[2].textContent = "Spent in " + now.toLocaleDateString("en-CA",{month:"short"});
+    renderTrip();
+    if (selectedMeal) renderMealDetail();
+  }
+  render();
+  renderMeals();
+})();
+</script>
+<script>
+/* Home-screen packaging: register the offline service worker where the
+   hosting allows it (https/http). On a plain file open there is no worker
+   and the app runs exactly the same without one. */
+(function(){
+  if (!("serviceWorker" in navigator)) return;
+  if (location.protocol !== "https:" && location.protocol !== "http:") return;
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+})();
+</script>
+</body>
+</html>
